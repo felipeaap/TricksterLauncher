@@ -14,6 +14,10 @@
 #include <Shlwapi.h>
 #include <algorithm>
 #include <cctype>
+#include <iomanip>
+#include <mutex>
+#include <sstream>
+#include <unordered_map>
 
 namespace
 {
@@ -114,9 +118,10 @@ void Helper::FileCheckUpdate()
     });
 
     updateCount = verifier.CountUpdates(ListaArquivos);
-    WorkerUpdating(updateCount);
-    isWorkerDone = true;
-    SaveLocalVersion(currentVersion);
+    const bool success = WorkerUpdating(updateCount);
+    isWorkerDone = success;
+    if (success)
+        SaveLocalVersion(currentVersion);
 }
 
 void Helper::CheckWorker(bool isFullCheck)
@@ -151,9 +156,10 @@ void Helper::CheckWorker(bool isFullCheck)
         }
 
         coordinator.Check(ListaArquivos, isFullCheck, localVersion, currentVersion, updateCount);
-        WorkerUpdating(updateCount);
-        isWorkerDone = true;
-        SaveLocalVersion(currentVersion);
+        const bool success = WorkerUpdating(updateCount);
+        isWorkerDone = success;
+        if (success)
+            SaveLocalVersion(currentVersion);
     });
 }
 
@@ -223,7 +229,7 @@ bool Helper::DownloadFile(const std::string& remoteFile, const std::string& loca
     return result;
 }
 
-void Helper::WorkerUpdating(int updateCount)
+bool Helper::WorkerUpdating(int updateCount)
 {
     int index = 1;
     gui::g_iTotalProgress.store(0.0f, std::memory_order_relaxed);
@@ -237,15 +243,18 @@ void Helper::WorkerUpdating(int updateCount)
             std::string remotePath = file.FilePath;
             std::replace(remotePath.begin(), remotePath.end(), '\\', '/');
             std::string dirPath = GetDirectoryFromPath(file.FilePath);
-            CreateDirectoryIfNotExists(dirPath);
+            if (!CreateDirectoryIfNotExists(dirPath))
+                return false;
             {
                 std::lock_guard<std::mutex> lockFile(gui::g_FileStringMutex);
                 gui::g_FileString = lang::GetString("launcher_worker_downloading") + ": " + fileName;
             }
-            DownloadFile(remotePath, file.FilePath, index, updateCount);
+            if (!DownloadFile(remotePath, file.FilePath, index, updateCount))
+                return false;
             index++;
         }
     }
+
     gui::g_iFileProgress.store(1.0f, std::memory_order_relaxed);
     gui::g_iTotalProgress.store(1.0f, std::memory_order_relaxed);
     {
@@ -255,6 +264,7 @@ void Helper::WorkerUpdating(int updateCount)
         else
             gui::g_FileString = lang::GetString("launcher_worker_maintenance");
     }
+    return true;
 }
 
 bool Helper::InjectDLL(HANDLE hProcess, const std::string& dllPath)
@@ -292,6 +302,7 @@ void Helper::UpdateLauncher()
     GetModuleFileNameA(nullptr, exePath, MAX_PATH);
     currentExe = exePath;
 
+    const std::filesystem::path launcherPath(currentExe);
     LauncherUpdater updater(GetEndpoints(), config::IsCDNUsingSSL);
     const std::string remoteLauncherHash = GetFileFromURL(1);
     if (remoteLauncherHash.empty())
@@ -301,7 +312,7 @@ void Helper::UpdateLauncher()
         return;
     }
 
-    if (!updater.Update(launcherName, remoteLauncherHash, launcherName, currentExe))
+    if (!updater.Update(launcherPath, remoteLauncherHash, launcherName, currentExe))
     {
         MessageBoxA(NULL, lang::GetString("launcher_update_download_fail").c_str(), "Error!", MB_OK);
         PostQuitMessage(0);
