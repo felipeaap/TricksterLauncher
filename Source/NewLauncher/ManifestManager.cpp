@@ -4,7 +4,71 @@
 #include <cctype>
 #include <utility>
 
+#include "Config.h"
+#include "ManifestSecurity.h"
 #include "json.hpp"
+
+namespace
+{
+std::string CanonicalManifestPayload(const nlohmann::json& document)
+{
+    nlohmann::json payload = document;
+    payload.erase("signature");
+    return payload.dump();
+}
+
+bool ValidateConsolidatedManifest(const nlohmann::json& document)
+{
+    const auto signature = document.find("signature");
+    if (signature == document.end() || !signature->is_object())
+        return !config::ManifestRequireSignature;
+
+    const std::string value = signature->value("value", "");
+    if (value.empty() || config::ManifestPublicKeyPem.empty())
+        return false;
+
+    return manifest_security::Verify(
+        CanonicalManifestPayload(document),
+        value,
+        config::ManifestPublicKeyPem);
+}
+
+void LoadFilesFromArray(const nlohmann::json& array,
+                        ManifestManager::FileList& files)
+{
+    if (!array.is_array())
+        return;
+
+    for (const auto& item : array)
+    {
+        Arquivo file;
+        file.FileID = item.value("FileID", 0);
+        file.FileHash = item.value("FileHash", "");
+        file.FilePath = item.value("FilePath", "");
+        file.ToUpdate = item.value("ToUpdate", false);
+        ManifestManager::FileList::value_type copy = file;
+
+        const auto it = std::find_if(files.begin(), files.end(),
+            [&](const Arquivo& current)
+            {
+                if (current.FilePath.size() != copy.FilePath.size())
+                    return false;
+                for (size_t i = 0; i < current.FilePath.size(); ++i)
+                {
+                    if (std::tolower(static_cast<unsigned char>(current.FilePath[i])) !=
+                        std::tolower(static_cast<unsigned char>(copy.FilePath[i])))
+                        return false;
+                }
+                return true;
+            });
+
+        if (it != files.end())
+            *it = copy;
+        else
+            files.push_back(copy);
+    }
+}
+}
 
 ManifestManager::ManifestManager(FetchFunction fetch)
     : fetch_(std::move(fetch))
@@ -16,6 +80,28 @@ int ManifestManager::Load(FileList& files, bool isFullCheck, int& localVersion)
     localVersion = isFullCheck ? 1 : localVersion;
     files.clear();
 
+    // Prefer the new signed/consolidated manifest. The versioned manifests
+    // remain available as a compatibility path during the migration.
+    try
+    {
+        const std::string consolidated = fetch_("/manifest.json");
+        if (!consolidated.empty())
+        {
+            const nlohmann::json document = nlohmann::json::parse(consolidated);
+            if (!ValidateConsolidatedManifest(document))
+                return localVersion;
+
+            const int manifestVersion = document.value("version", localVersion);
+            LoadFilesFromArray(document.value("files", nlohmann::json::array()), files);
+            return manifestVersion;
+        }
+    }
+    catch (const nlohmann::json::exception&)
+    {
+        files.clear();
+        return localVersion;
+    }
+
     int currentVersion = localVersion;
     while (true)
     {
@@ -24,17 +110,15 @@ int ManifestManager::Load(FileList& files, bool isFullCheck, int& localVersion)
         if (jsonContent.empty())
             break;
 
-        const nlohmann::json document = nlohmann::json::parse(jsonContent);
-        if (document.is_array())
+        try
         {
-            for (const auto& item : document)
-            {
-                Arquivo file;
-                file.FileID = item.value("FileID", 0);
-                file.FileHash = item.value("FileHash", "");
-                file.FilePath = item.value("FilePath", "");
-                MergeFile(files, file);
-            }
+            const nlohmann::json document = nlohmann::json::parse(jsonContent);
+            if (document.is_array())
+                LoadFilesFromArray(document, files);
+        }
+        catch (const nlohmann::json::exception&)
+        {
+            break;
         }
 
         ++currentVersion;
