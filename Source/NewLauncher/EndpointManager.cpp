@@ -1,7 +1,10 @@
 #include "EndpointManager.h"
 
+#include <chrono>
 #include <filesystem>
 #include <utility>
+
+#include "DownloadTelemetry.h"
 
 namespace
 {
@@ -57,8 +60,30 @@ bool EndpointManager::Download(const std::string& remotePath,
             RemovePartialDownloadState(localPath);
         attempted = true;
 
+        const auto started = std::chrono::steady_clock::now();
         DownloadManager manager(host, useSsl_, options_);
-        if (manager.Download(remotePath, localPath, progress, speed))
+        const bool success = manager.Download(remotePath, localPath, progress, speed);
+
+        long long bytes = 0;
+        std::error_code error;
+        const auto path = std::filesystem::path(localPath);
+        if (std::filesystem::exists(path, error))
+            bytes = static_cast<long long>(std::filesystem::file_size(path, error));
+
+        const double seconds = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - started).count();
+
+        download_telemetry::Record({
+            host,
+            remotePath,
+            bytes,
+            seconds,
+            options_.maxConnections,
+            options_.maxConnections > 1,
+            success
+        });
+
+        if (success)
             return true;
     }
 
