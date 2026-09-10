@@ -7,6 +7,8 @@
 #include "FileVerifier.h"
 #include "DownloadManager.h"
 #include "UpdateCoordinator.h"
+#include "GameLauncher.h"
+#include "LauncherUpdater.h"
 #include <direct.h>
 #include <Shlwapi.h>
 #include <algorithm>
@@ -235,94 +237,51 @@ void Helper::WorkerUpdating(int updateCount)
 
 bool Helper::InjectDLL(HANDLE hProcess, const std::string& dllPath)
 {
-    LPVOID pRemote = VirtualAllocEx(hProcess, nullptr, strlen(dllPath.c_str()) + 1, MEM_COMMIT, PAGE_READWRITE);
-    if (!pRemote)
-        return false;
-    if (!WriteProcessMemory(hProcess, pRemote, dllPath.c_str(), strlen(dllPath.c_str()) + 1, nullptr))
-    {
-        VirtualFreeEx(hProcess, pRemote, 0, MEM_RELEASE);
-        return false;
-    }
-    HANDLE hThread = CreateRemoteThread(hProcess, nullptr, 0, (LPTHREAD_START_ROUTINE)LoadLibraryA, pRemote, 0, nullptr);
-    if (!hThread)
-    {
-        VirtualFreeEx(hProcess, pRemote, 0, MEM_RELEASE);
-        return false;
-    }
-    WaitForSingleObject(hThread, INFINITE);
-    CloseHandle(hThread);
-    VirtualFreeEx(hProcess, pRemote, 0, MEM_RELEASE);
-    return true;
+    GameLauncher launcher({ true, dllPath, 0 });
+    return launcher.InjectDLL(hProcess, dllPath);
 }
 
 std::filesystem::path Helper::GetGamePath()
 {
-    char buffer[MAX_PATH];
+    char buffer[MAX_PATH]{};
     GetModuleFileNameA(nullptr, buffer, MAX_PATH);
-    std::filesystem::path exePath(buffer);
-    std::filesystem::path dir = exePath.parent_path();
-    return dir;
+    return std::filesystem::path(buffer).parent_path();
 }
 
 void Helper::ClickPlayButton()
 {
-    STARTUPINFOA si = { sizeof(si) };
-    PROCESS_INFORMATION pi;
-    std::filesystem::path gameExe = GetGamePath() / "Trickster.exe";
-    std::string exePath = gameExe.string();
-    if (!CreateProcessA(exePath.c_str(), nullptr, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
-        return;
-    if (config::IsDllInjectEnable)
-    {
-        Sleep(2000);
-        if (!InjectDLL(pi.hProcess, config::InjectDLLName.c_str()))
-        {
-            TerminateProcess(pi.hProcess, 0);
-            return;
-        }
-    }
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
-    ExitProcess(0);
+    GameLauncher::Options options;
+    options.injectDll = config::IsDllInjectEnable;
+    options.dllPath = config::InjectDLLName;
+    options.injectionDelayMilliseconds = 2000;
+
+    GameLauncher launcher(options);
+    if (launcher.Launch(GetGamePath()))
+        ExitProcess(0);
 }
 
 void Helper::UpdateLauncher()
 {
     std::string launcherName = "Splash.exe";
     std::transform(launcherName.begin(), launcherName.end(), launcherName.begin(), [](unsigned char c) { return std::tolower(c); });
-    std::string fileHash = crypt::createMD5FromFile(launcherName);
-    std::string remoteLauncherHash = GetFileFromURL(1);
-    if (remoteLauncherHash == "")
+
+    std::string currentExe;
+    char exePath[MAX_PATH]{};
+    GetModuleFileNameA(nullptr, exePath, MAX_PATH);
+    currentExe = exePath;
+
+    LauncherUpdater updater(config::LauncherCDN, config::IsCDNUsingSSL);
+    const std::string remoteLauncherHash = GetFileFromURL(1);
+    if (remoteLauncherHash.empty())
     {
         MessageBoxA(NULL, lang::GetString("launcher_update_check_fail").c_str(), "Error!", MB_OK);
         PostQuitMessage(0);
+        return;
     }
-    else
+
+    if (!updater.Update(launcherName, remoteLauncherHash, launcherName, currentExe))
     {
-        if (fileHash != remoteLauncherHash)
-        {
-            if (DownloadFile(launcherName, launcherName, 1, 1))
-            {
-                std::string currentExe;
-                char exePath[MAX_PATH];
-                GetModuleFileNameA(nullptr, exePath, MAX_PATH);
-                currentExe = exePath;
-                STARTUPINFOA si = { sizeof(si) };
-                PROCESS_INFORMATION pi;
-                if (!CreateProcessA(currentExe.c_str(), nullptr, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
-                {
-                    MessageBoxA(NULL, lang::GetString("launcher_update_launch_fail").c_str(), "Error!", MB_OK);
-                    PostQuitMessage(0);
-                }
-                CloseHandle(pi.hThread);
-                CloseHandle(pi.hProcess);
-                ExitProcess(0);
-            }
-            else
-            {
-                MessageBoxA(NULL, lang::GetString("launcher_update_download_fail").c_str(), "Error!", MB_OK);
-                PostQuitMessage(0);
-            }
-        }
+        MessageBoxA(NULL, lang::GetString("launcher_update_download_fail").c_str(), "Error!", MB_OK);
+        PostQuitMessage(0);
     }
 }
