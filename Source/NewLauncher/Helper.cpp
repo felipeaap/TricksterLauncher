@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "Language.h"
 #include "VersionManager.h"
+#include "ManifestManager.h"
 #include <direct.h>
 #include <Shlwapi.h>
 #include <execution>
@@ -31,39 +32,17 @@ void Helper::SaveLocalVersion(int version)
 
 void Helper::ParseVersionedFileLists(bool isFullCheck)
 {
-    if (isFullCheck)
-        localVersion = 1;
-    else
+    if (!isFullCheck)
         GetLocalVersion();
-    currentVersion = localVersion;
-    ListaArquivos.clear();
+
     std::lock_guard<std::mutex> lockFile(gui::g_FileStringMutex);
     gui::g_FileString = lang::GetString("launcher_filelist_building");
-    while (true) 
-    {
-        std::string path = "/version/version_" + std::to_string(currentVersion) + ".json";
-        std::string jsonContent = GetFileFromURL(path);
-        if (jsonContent.empty())
-            break;
-        nlohmann::json j = nlohmann::json::parse(jsonContent);
-        if (j.is_array()) 
-        {
-            for (const auto& item : j) 
-            {
-                Arquivo a;
-                a.FileID = item.value("FileID", 0);
-                a.FileHash = item.value("FileHash", "");
-                a.FilePath = item.value("FilePath", "");
-                auto it = std::find_if(ListaArquivos.begin(), ListaArquivos.end(),
-                    [&](const Arquivo& x) { return iequals(x.FilePath, a.FilePath); });
-                if (it != ListaArquivos.end())
-                    *it = a;
-                else
-                    ListaArquivos.push_back(a);
-            }
-        }
-        currentVersion++;
-    }
+
+    ManifestManager manifests([this](const std::string& path) {
+        return GetFileFromURL(path);
+    });
+
+    currentVersion = manifests.Load(ListaArquivos, isFullCheck, localVersion);
 }
 
 std::string Helper::GetFileFromURL(int iType)
@@ -78,7 +57,7 @@ std::string Helper::GetFileFromURL(int iType)
 
 std::string Helper::GetFileFromURL(const std::string& customPath)
 {
-    auto fetch = [&](auto& cli) -> std::string 
+    auto fetch = [&](auto& cli) -> std::string
     {
         cli.set_follow_location(true);
         cli.set_connection_timeout(5, 0);
@@ -87,12 +66,12 @@ std::string Helper::GetFileFromURL(const std::string& customPath)
             return "";
         return res->body;
     };
-    if (config::IsCDNUsingSSL) 
+    if (config::IsCDNUsingSSL)
     {
         httplib::SSLClient cli(config::LauncherCDN.c_str());
         return fetch(cli);
     }
-    else 
+    else
     {
         httplib::Client cli(config::LauncherCDN.c_str());
         return fetch(cli);
@@ -116,7 +95,7 @@ void Helper::FileCheckUpdate()
     gui::g_iFileProgress.store(1.0, std::memory_order_relaxed);
     std::atomic<int> count{ 0 };
     std::atomic<int> updates{ 0 };
-    std::for_each(std::execution::par_unseq, ListaArquivos.begin(), ListaArquivos.end(), [&](Arquivo& file) 
+    std::for_each(std::execution::par_unseq, ListaArquivos.begin(), ListaArquivos.end(), [&](Arquivo& file)
     {
         sem.acquire();
         bool doesFileExists = std::ifstream(file.FilePath).good();
