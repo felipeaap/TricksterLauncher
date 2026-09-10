@@ -1,16 +1,9 @@
 #include "UpdateCoordinator.h"
 
 #include <algorithm>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
-
-#include <direct.h>
 
 #include "FileVerifier.h"
 #include "ManifestManager.h"
-#include "DownloadManager.h"
 
 UpdateCoordinator::UpdateCoordinator(FetchFunction fetch,
                                      MessageCallback message,
