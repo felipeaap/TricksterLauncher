@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <mutex>
 #include <unordered_map>
 #include <windows.h>
