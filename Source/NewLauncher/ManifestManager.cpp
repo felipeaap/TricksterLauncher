@@ -32,22 +32,20 @@ bool ValidateConsolidatedManifest(const nlohmann::json& document)
         value,
         config::ManifestPublicKeyPem);
 }
-}
 
-ManifestManager::ManifestManager(FetchFunction fetch)
-    : fetch_(std::move(fetch))
+bool SamePathIgnoreCase(const std::string& left, const std::string& right)
 {
-}
+    if (left.size() != right.size())
+        return false;
 
-void ManifestManager::MergeFile(FileList& files, const Arquivo& file)
-{
-    const auto it = std::find_if(files.begin(), files.end(),
-        [&](const Arquivo& current) { return IsSamePath(current.FilePath, file.FilePath); });
+    for (size_t i = 0; i < left.size(); ++i)
+    {
+        if (std::tolower(static_cast<unsigned char>(left[i])) !=
+            std::tolower(static_cast<unsigned char>(right[i])))
+            return false;
+    }
 
-    if (it != files.end())
-        *it = file;
-    else
-        files.push_back(file);
+    return true;
 }
 
 void LoadFilesFromArray(const nlohmann::json& array, ManifestManager::FileList& files)
@@ -65,13 +63,19 @@ void LoadFilesFromArray(const nlohmann::json& array, ManifestManager::FileList& 
         file.FileSize = item.value("FileSize", 0LL);
 
         const auto it = std::find_if(files.begin(), files.end(),
-            [&](const Arquivo& current) { return ManifestManager::IsSamePath(current.FilePath, file.FilePath); });
+            [&](const Arquivo& current) { return SamePathIgnoreCase(current.FilePath, file.FilePath); });
 
         if (it != files.end())
             *it = file;
         else
             files.push_back(file);
     }
+}
+}
+
+ManifestManager::ManifestManager(FetchFunction fetch)
+    : fetch_(std::move(fetch))
+{
 }
 
 int ManifestManager::Load(FileList& files, bool isFullCheck, int& localVersion)
@@ -126,15 +130,16 @@ int ManifestManager::Load(FileList& files, bool isFullCheck, int& localVersion)
 
 bool ManifestManager::IsSamePath(const std::string& left, const std::string& right)
 {
-    if (left.size() != right.size())
-        return false;
+    return SamePathIgnoreCase(left, right);
+}
 
-    for (size_t i = 0; i < left.size(); ++i)
-    {
-        if (std::tolower(static_cast<unsigned char>(left[i])) !=
-            std::tolower(static_cast<unsigned char>(right[i])))
-            return false;
-    }
+void ManifestManager::MergeFile(FileList& files, const Arquivo& file)
+{
+    const auto it = std::find_if(files.begin(), files.end(),
+        [&](const Arquivo& current) { return IsSamePath(current.FilePath, file.FilePath); });
 
-    return true;
+    if (it != files.end())
+        *it = file;
+    else
+        files.push_back(file);
 }
