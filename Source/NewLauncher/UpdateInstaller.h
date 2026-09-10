@@ -30,6 +30,7 @@ private:
 
     bool DownloadOne(const std::string& remotePath,
                      const std::string& localPath,
+                     long long fileSize,
                      int fileIndex,
                      int totalFiles,
                      const ProgressCallback& progress,
