@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <utility>
 
+#include "DownloadPolicy.h"
 #include "EndpointManager.h"
 
 UpdateInstaller::UpdateInstaller(std::vector<std::string> hosts,
@@ -48,7 +49,8 @@ bool UpdateInstaller::Install(const std::vector<Arquivo>& files,
                 : file.FilePath.substr(separator + 1));
         }
 
-        if (!DownloadOne(remotePath, file.FilePath, index, updateCount, progress, speed))
+        if (!DownloadOne(remotePath, file.FilePath, file.FileSize,
+                         index, updateCount, progress, speed))
             return false;
 
         ++index;
@@ -61,12 +63,28 @@ bool UpdateInstaller::Install(const std::vector<Arquivo>& files,
 
 bool UpdateInstaller::DownloadOne(const std::string& remotePath,
                                   const std::string& localPath,
+                                  long long fileSize,
                                   int fileIndex,
                                   int totalFiles,
                                   const ProgressCallback& progress,
                                   const SpeedCallback& speed) const
 {
-    EndpointManager endpoints(hosts_, useSsl_, options_);
+    DownloadManager::Options effective = options_;
+    const auto policy = download_policy::ForSize(
+        fileSize,
+        1,
+        options_.maxConnections);
+
+    if (fileSize > 0)
+    {
+        effective.maxConnections = policy.connections;
+        effective.segmentSizeBytes = policy.segmentSizeBytes;
+        effective.multiConnectionThresholdBytes =
+            std::min(options_.multiConnectionThresholdBytes,
+                     std::max(1LL, fileSize));
+    }
+
+    EndpointManager endpoints(hosts_, useSsl_, effective);
     return endpoints.Download(
         remotePath,
         localPath,
