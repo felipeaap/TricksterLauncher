@@ -2,20 +2,16 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include "DownloadManager.h"
 
 class LauncherUpdater
 {
 public:
-    struct Callbacks
-    {
-        std::string remoteHash;
-        std::string localPath;
-        std::string remotePath;
-    };
-
-    LauncherUpdater(std::string host, bool useSsl, DownloadManager::Options options = {});
+    LauncherUpdater(std::vector<std::string> hosts,
+                    bool useSsl,
+                    DownloadManager::Options options = {});
 
     bool Update(const std::filesystem::path& launcherPath,
                 const std::string& remoteHash,
@@ -23,7 +19,7 @@ public:
                 const std::string& currentExecutable) const;
 
 private:
-    std::string host_;
+    std::vector<std::string> hosts_;
     bool useSsl_;
     DownloadManager::Options options_;
 };
