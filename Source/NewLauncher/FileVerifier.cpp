@@ -1,11 +1,12 @@
 #include "FileVerifier.h"
 
 #include <algorithm>
+#include <atomic>
 #include <execution>
 #include <fstream>
 #include <semaphore>
 #include <string>
-#include <atomic>
+#include <utility>
 
 #include "Crypt.h"
 
