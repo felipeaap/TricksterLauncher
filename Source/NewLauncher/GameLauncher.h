@@ -17,10 +17,10 @@ public:
     explicit GameLauncher(Options options = {});
 
     bool Launch(const std::filesystem::path& launcherDirectory) const;
+    bool InjectDLL(HANDLE process, const std::string& dllPath) const;
 
 private:
     static std::filesystem::path ResolveGamePath(const std::filesystem::path& launcherDirectory);
-    bool InjectDLL(HANDLE process, const std::string& dllPath) const;
 
     Options options_;
 };
