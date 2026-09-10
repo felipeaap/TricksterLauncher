@@ -8,7 +8,7 @@
 #include <string>
 #include <utility>
 
-#include "Crypt.h"
+#include "Integrity.h"
 
 namespace
 {
@@ -42,8 +42,8 @@ int FileVerifier::CountUpdates(std::vector<Arquivo>& files) const
             }
             else
             {
-                const std::string fileHash = crypt::createMD5FromFile(file.FilePath);
-                file.ToUpdate = (fileHash != file.FileHash);
+                const std::string fileHash = integrity::createHashFromFile(file.FilePath, file.FileHash);
+                file.ToUpdate = fileHash.empty() || fileHash != file.FileHash;
                 if (file.ToUpdate)
                     updates.fetch_add(1, std::memory_order_relaxed);
             }
