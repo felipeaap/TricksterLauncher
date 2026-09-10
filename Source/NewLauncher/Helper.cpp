@@ -2,6 +2,7 @@
 #include "Gui.h"
 #include "Config.h"
 #include "Language.h"
+#include "VersionManager.h"
 #include <direct.h>
 #include <Shlwapi.h>
 #include <execution>
@@ -14,21 +15,18 @@ Helper::Helper()
     g_PopupPage = 0;
     updateCount = 0;
     ListaArquivos.clear();
-    localVersion, currentVersion = 0;
+    localVersion = 0;
+    currentVersion = 0;
 }
 
 void Helper::GetLocalVersion()
 {
-    std::ifstream f("version.dat");
-    localVersion = 1;
-    if (f.good())
-        f >> localVersion;
+    localVersion = VersionManager::Load();
 }
 
 void Helper::SaveLocalVersion(int version)
 {
-    std::ofstream f("version.dat", std::ios::trunc);
-    f << version;
+    VersionManager::Save(version);
 }
 
 void Helper::ParseVersionedFileLists(bool isFullCheck)
