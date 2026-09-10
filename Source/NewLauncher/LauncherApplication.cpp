@@ -9,6 +9,7 @@
 
 #include "Config.h"
 #include "Gui.h"
+#include "LauncherWebView.h"
 #include "LauncherWindow.h"
 
 bool LauncherApplication::RequiresAdmin(const wchar_t* folderPath)
@@ -50,11 +51,10 @@ void LauncherApplication::RelaunchAsAdmin(const wchar_t* exePath)
 
 int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
 {
-    (void)instance;
     (void)commandShow;
 
     wchar_t exePath[MAX_PATH]{};
-    if (!GetModuleFileNameW(nullptr, exePath, MAX_PATH))
+    if (!GetModuleFileNameW(instance, exePath, MAX_PATH))
         return EXIT_FAILURE;
 
     wchar_t folderPath[MAX_PATH]{};
@@ -72,6 +72,24 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
         return EXIT_FAILURE;
 
     LauncherWindow launcherWindow;
+    LauncherWebView webView;
+
+    launcherWindow.SetResizeCallback([](UINT width, UINT height)
+    {
+        if (gui::device)
+        {
+            gui::presentParameters.BackBufferWidth = width;
+            gui::presentParameters.BackBufferHeight = height;
+            gui::ResetDevice();
+        }
+    });
+
+    launcherWindow.SetMoveCallback([&webView]()
+    {
+        const RECT bounds{19, 32, 19 + 503, 32 + 343};
+        webView.SetBounds(bounds);
+    });
+
     if (!launcherWindow.Create(config::WindowTitle.c_str()))
     {
         CoUninitialize();
@@ -87,7 +105,8 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
 
     gui::CreateImGui();
     gui::LoadResources();
-    gui::InitWebView(gui::window);
+
+    webView.Initialize(launcherWindow.Handle(), config::BaseNewsURL);
 
     while (launcherWindow.PumpMessages())
     {
@@ -97,6 +116,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 
+    webView.Shutdown();
     gui::DestroyImGui();
     gui::DestroyDevice();
     launcherWindow.Destroy();
