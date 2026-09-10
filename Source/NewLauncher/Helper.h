@@ -1,20 +1,11 @@
 #pragma once
 
 #include <atomic>
-#include <chrono>
-#include <cstring>
-#include <cstdlib>
 #include <filesystem>
-#include <fstream>
-#include <future>
-#include <iostream>
-#include <queue>
 #include <string>
 #include <thread>
-#include <unordered_map>
 #include <vector>
 
-#include "Crypt.h"
 #include "UpdateTypes.h"
 
 class Helper
