@@ -19,6 +19,7 @@
     <ClCompile Include="Config.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Crypt.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="DownloadManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
+    <ClCompile Include="DownloadPolicy.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="DownloadTelemetry.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="EndpointManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="FileVerifier.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
@@ -52,6 +53,7 @@
     <ClInclude Include="Config.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="Crypt.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="DownloadManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
+    <ClInclude Include="DownloadPolicy.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="DownloadTelemetry.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="EndpointManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="FileVerifier.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
