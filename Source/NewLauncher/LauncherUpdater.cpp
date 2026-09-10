@@ -38,7 +38,7 @@ bool LauncherUpdater::Update(const std::filesystem::path& launcherPath,
     if (!endpoints.Download(remotePath, stagedPath.string()))
         return false;
 
-    const std::string downloadedHash = integrity::createSHA256FromFile(stagedPath.string());
+    const std::string downloadedHash = integrity::createHashFromFile(stagedPath.string(), remoteHash);
     if (downloadedHash.empty() ||
         downloadedHash != remoteHash ||
         !std::filesystem::exists(updaterPath, error))
@@ -54,7 +54,7 @@ bool LauncherUpdater::Update(const std::filesystem::path& launcherPath,
         " --target \"" + launcherPath.string() + "\""
         " --new \"" + stagedPath.string() + "\""
         " --backup \"" + backupPath.string() + "\""
-        " --sha256 \"" + remoteHash + "\""
+        " --hash \"" + remoteHash + "\""
         " --pid " + std::to_string(GetCurrentProcessId());
     std::vector<char> mutableCommand(command.begin(), command.end());
     mutableCommand.push_back('\0');
