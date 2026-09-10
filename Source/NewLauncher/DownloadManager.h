@@ -9,7 +9,14 @@ public:
     using ProgressCallback = std::function<void(long long, long long)>;
     using SpeedCallback = std::function<void(double)>;
 
-    DownloadManager(std::string host, bool useSsl);
+    struct Options
+    {
+        int maxRetries = 3;
+        int connectionTimeoutSeconds = 5;
+        int retryDelayMilliseconds = 500;
+    };
+
+    DownloadManager(std::string host, bool useSsl, Options options = {});
 
     std::string Get(const std::string& path) const;
     bool Download(const std::string& remotePath,
@@ -20,4 +27,5 @@ public:
 private:
     std::string host_;
     bool useSsl_;
+    Options options_;
 };
