@@ -1,0 +1,23 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.VC.db
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# Generated output directories
+Output/
+**/Output/
+
+# Debug symbols / generated binaries
+*.pdb
+*.ilk
+*.exe
+*.dll
