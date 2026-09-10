@@ -32,7 +32,7 @@ public:
     void CheckWorker(bool isFullCheck = false);
     std::string GetDirectoryFromPath(const std::string& filepath);
     bool CreateDirectoryIfNotExists(const std::string& dirPath);
-    void WorkerUpdating(int updateCount);
+    bool WorkerUpdating(int updateCount);
     bool DownloadFile(const std::string& remoteFile, const std::string& localPath, int fileIndex, int totalFiles);
     bool InjectDLL(HANDLE hProcess, const std::string& dllPath);
     void ClickPlayButton();
