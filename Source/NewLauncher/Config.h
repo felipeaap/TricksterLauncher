@@ -14,4 +14,8 @@ namespace config
     extern bool IsCDNUsingSSL;
     extern bool IsDllInjectEnable;
     extern std::string InjectDLLName;
+
+    // Signed consolidated manifest migration.
+    extern bool ManifestRequireSignature;
+    extern std::string ManifestPublicKeyPem;
 }
