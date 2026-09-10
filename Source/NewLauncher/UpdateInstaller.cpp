@@ -1,10 +1,7 @@
 #include "UpdateInstaller.h"
 
 #include <algorithm>
-#include <direct.h>
-#include <iomanip>
-#include <mutex>
-#include <sstream>
+#include <filesystem>
 #include <utility>
 
 #include "EndpointManager.h"
@@ -70,7 +67,7 @@ bool UpdateInstaller::DownloadOne(const std::string& remotePath,
                                   const SpeedCallback& speed) const
 {
     EndpointManager endpoints(hosts_, useSsl_, options_);
-    const bool result = endpoints.Download(
+    return endpoints.Download(
         remotePath,
         localPath,
         [&](long long downloaded, long long contentLength)
@@ -87,8 +84,6 @@ bool UpdateInstaller::DownloadOne(const std::string& remotePath,
                 progress(fileProgress, totalProgress);
         },
         speed);
-
-    return result;
 }
 
 bool UpdateInstaller::EnsureDirectory(const std::string& directory)
@@ -96,32 +91,9 @@ bool UpdateInstaller::EnsureDirectory(const std::string& directory)
     if (directory.empty())
         return true;
 
-    std::string fixedPath = directory;
-    std::replace(fixedPath.begin(), fixedPath.end(), '\\', '/');
-
-    std::string current;
-    if (fixedPath.size() >= 2 && fixedPath[1] == ':')
-        current = fixedPath.substr(0, 2);
-
-    std::stringstream stream(fixedPath);
-    std::string token;
-    while (std::getline(stream, token, '/'))
-    {
-        if (token.empty())
-            continue;
-
-        if (!current.empty() && current.back() != ':')
-            current += '/';
-        current += token;
-
-        if (_mkdir(current.c_str()) != 0)
-        {
-            // A pre-existing directory is the expected case.
-            // Other errors are checked by the caller when the file is opened.
-        }
-    }
-
-    return true;
+    std::error_code error;
+    std::filesystem::create_directories(directory, error);
+    return !error && std::filesystem::is_directory(directory, error) && !error;
 }
 
 std::string UpdateInstaller::DirectoryFromPath(const std::string& path)
