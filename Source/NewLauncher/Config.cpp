@@ -1,4 +1,3 @@
-#pragma once
 #include "Config.h"
 
 namespace config
@@ -13,4 +12,6 @@ namespace config
     bool IsCDNUsingSSL          = true;
     bool IsDllInjectEnable      = false;
     std::string InjectDLLName   = "Trickster.dll";
+    bool ManifestRequireSignature = false;
+    std::string ManifestPublicKeyPem = {};
 }
