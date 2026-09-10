@@ -8,6 +8,8 @@
 
 namespace
 {
+constexpr DWORD kLaunchHealthTimeoutMs = 5000;
+
 std::string GetArg(int argc, char** argv, const char* name)
 {
     for (int i = 1; i + 1 < argc; ++i)
@@ -28,7 +30,7 @@ bool WaitForProcess(DWORD pid)
     return result == WAIT_OBJECT_0;
 }
 
-bool Launch(const std::filesystem::path& path)
+bool LaunchAndVerify(const std::filesystem::path& path)
 {
     STARTUPINFOA si{};
     si.cb = sizeof(si);
@@ -39,9 +41,12 @@ bool Launch(const std::filesystem::path& path)
     if (!CreateProcessA(nullptr, mutableCommand.data(), nullptr, nullptr, FALSE, 0,
                         nullptr, path.parent_path().string().c_str(), &si, &pi))
         return false;
+
+    const DWORD result = WaitForSingleObject(pi.hProcess, kLaunchHealthTimeoutMs);
+    const bool healthy = (result == WAIT_TIMEOUT);
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
-    return true;
+    return healthy;
 }
 }
 
@@ -76,12 +81,14 @@ int main(int argc, char** argv)
         MoveFileExA(backup.string().c_str(), target.string().c_str(), MOVEFILE_WRITE_THROUGH);
         return 5;
     }
-    if (!Launch(target))
+
+    if (!LaunchAndVerify(target))
     {
         MoveFileExA(target.string().c_str(), replacement.string().c_str(), MOVEFILE_WRITE_THROUGH);
         MoveFileExA(backup.string().c_str(), target.string().c_str(), MOVEFILE_WRITE_THROUGH);
         return 6;
     }
+
     std::filesystem::remove(backup, error);
     return 0;
 }
