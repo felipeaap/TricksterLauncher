@@ -59,12 +59,7 @@ int __stdcall wWinMain(HINSTANCE instance, HINSTANCE previousInstance, PWSTR arg
         RelaunchAsAdmin(exePathW);
         return 0;
     }
-    std::filesystem::path currentExe(exePath);
-    std::string extension = currentExe.extension().string();
-    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (extension == ".exe")
-        if (gui::copyAndRunSelf()) 
-            return 0;
+
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(hr)) return -1;
     gui::CreateHWindow(config::WindowTitle.c_str());
@@ -73,7 +68,6 @@ int __stdcall wWinMain(HINSTANCE instance, HINSTANCE previousInstance, PWSTR arg
     gui::LoadResources();
     gui::InitWebView(gui::window);
     MSG msg = {};
-    bool firstFrame = true;
     while (gui::isRunning)
     {
         while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
