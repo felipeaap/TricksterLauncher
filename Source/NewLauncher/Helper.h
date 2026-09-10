@@ -14,7 +14,7 @@ class Helper
 public:
     Helper();
     bool isMaintenance;
-    bool isWorkerDone;
+    std::atomic<bool> isWorkerDone{ false };
     int g_PopupPage;
     int localVersion, currentVersion;
     std::string g_Message;
