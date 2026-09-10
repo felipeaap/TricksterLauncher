@@ -1,29 +1,33 @@
 https://github.com/user-attachments/assets/1ee4a782-afbc-4f08-845f-88c6b3453b9b
 
-
 # Trickster-Launcher
-## How to build:​
-1. Have **Visual studio 2022 installed**;​
-2. Make sure you have **Desktop C++** and **ALL the VS22 (143**) components installed;​
-3. Clone this repository, and extract the downloaded .zip in a new folder;​
-4. Open the **Trickster Launcher** solution;
-5. **Restore the NuGet packages**, by **right-clicking the Launcher project > Manage NuGet Packages > Restore button**;
-6. Change the configs to your liking, in the **Config.cpp** file;
-<img width="1183" height="286" alt="1756962394166- RaGEZONE" src="https://github.com/user-attachments/assets/e936f4fb-df9f-4382-99b2-215208929bbe" />
 
-7. **Build** the solution, the .exe will be inside the **Output folder**;
-<img width="720" height="192" alt="1756962433454- RaGEZONE" src="https://github.com/user-attachments/assets/4fedc2a6-a4f4-4cfa-92b2-6e54a335fe89" />
+## How to build
+1. Install **Visual Studio 2022** with the **Desktop development with C++** workload and the required VS 2022 C++ components.
+2. Clone this repository.
+3. Open **Trickster Launcher.sln**. The solution now contains both `NewLauncher` and the `FileListGen` tool.
+4. Restore the required NuGet packages for the launcher project.
+5. Adjust the launcher configuration in `Source/NewLauncher/Config.cpp` as needed.
+6. Build the solution. Build outputs are generated under `Output/`, which is intentionally ignored by Git.
 
-## What do i need to send to my players?
-**EVERYTHING** that is inside the output folder (minus the .pdb file)
+## FileListGen
+`FileListGen` is an independent build tool located at `tools/FileListGen` and is included in the main Visual Studio solution.
 
-<img width="166" height="151" alt="1756963226301- RaGEZONE" src="https://github.com/user-attachments/assets/64a907b1-fe18-4cd4-a944-88d4af99b0fa" />
+The tool expects the update workspace to contain:
 
-## How can i configure it in my host?
-Your update folder root should be like this:
+```text
+<Update root>/
+├── Update/
+│   └── ... game files ...
+└── version/
+```
 
-<img alt="1756963308867- RaGEZONE" src="https://i.imgur.com/Hp0OfO6.png" />
+Run `FileListGen.exe` from the update workspace. It scans `Update/`, generates the next `version_N.json` when changes are detected, and updates `launcher.txt` from `Update\\Splash.exe`.
 
-Inside the Update folder, you put files like you would in your trickster client, **same folder structure and everything INCLUDING THE SPLASH.EXE!**
-then you just run the **FileListGen.exe** and it is done!
-**Maintenance.txt** is simple, **true** puts the launcher in maintenance mode, **false** puts the launcher in online mode.
+## What should be distributed to players?
+Distribute the runtime files produced for the launcher. Development artifacts such as `.pdb` files are not required by players.
+
+## Hosting the update files
+The update host should expose the same directory structure expected by the launcher. Keep `Splash.exe` inside the `Update` directory so `FileListGen` can calculate its current launcher hash.
+
+`maintenance.txt` controls maintenance mode in the existing launcher workflow: `true` enables maintenance mode and `false` keeps the launcher online.
