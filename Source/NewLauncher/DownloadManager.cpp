@@ -224,8 +224,7 @@ bool DownloadRange(Client& client,
                    const std::filesystem::path& partPath,
                    long long start,
                    long long end,
-                   std::atomic<long long>& downloadedTotal,
-                   long long totalSize,
+                   std::atomic<long long>& segmentProgress,
                    const DownloadManager::ProgressCallback& progress,
                    const DownloadManager::SpeedCallback& speedCallback,
                    const std::chrono::steady_clock::time_point& overallStart,
@@ -248,35 +247,29 @@ bool DownloadRange(Client& client,
     if (!output)
         return false;
 
-    long long segmentDownloaded = 0;
+    long long received = 0;
     const long long expected = end - start + 1;
 
     const auto response = client.Get(("/Update/" + remotePath).c_str(), headers,
         [&](const char* data, size_t length)
         {
-            if (segmentDownloaded + static_cast<long long>(length) > expected)
+            if (received + static_cast<long long>(length) > expected)
                 return false;
 
             output.write(data, static_cast<std::streamsize>(length));
             if (!output)
                 return false;
 
-            segmentDownloaded += static_cast<long long>(length);
-            downloadedTotal.fetch_add(static_cast<long long>(length), std::memory_order_relaxed);
+            received += static_cast<long long>(length);
+            segmentProgress.store(received, std::memory_order_relaxed);
 
             if (progress)
-            {
-                const long long current = downloadedTotal.load(std::memory_order_relaxed);
-                progress(current, totalSize);
-            }
+                progress(received, expected);
 
             const double elapsed = std::chrono::duration<double>(
                 std::chrono::steady_clock::now() - overallStart).count();
             if (speedCallback)
-            {
-                const long long current = downloadedTotal.load(std::memory_order_relaxed);
-                speedCallback(elapsed > 0.0 ? current / elapsed : 0.0);
-            }
+                speedCallback(elapsed > 0.0 ? received / elapsed : 0.0);
 
             return true;
         });
@@ -285,7 +278,7 @@ bool DownloadRange(Client& client,
     const bool writeOk = output.good();
     output.close();
 
-    return writeOk && response && response->status == 206 && segmentDownloaded == expected;
+    return writeOk && response && response->status == 206 && received == expected;
 }
 
 template <typename Client>
@@ -334,16 +327,16 @@ bool DownloadSingleWithResume(Client& client,
                     return false;
 
                 received += static_cast<long long>(length);
-                totalDownloaded.store(offset + received, std::memory_order_relaxed);
+                downloadedTotal.store(offset + received, std::memory_order_relaxed);
 
                 if (progress)
-                    progress(totalDownloaded.load(std::memory_order_relaxed), totalSize);
+                    progress(downloadedTotal.load(std::memory_order_relaxed), totalSize);
 
                 const double elapsed = std::chrono::duration<double>(
                     std::chrono::steady_clock::now() - overallStart).count();
                 if (speedCallback)
                 {
-                    const long long current = totalDownloaded.load(std::memory_order_relaxed);
+                    const long long current = downloadedTotal.load(std::memory_order_relaxed);
                     speedCallback(elapsed > 0.0 ? current / elapsed : 0.0);
                 }
 
@@ -364,7 +357,7 @@ bool DownloadSingleWithResume(Client& client,
         {
             std::filesystem::remove(partPath, error);
             offset = 0;
-            totalDownloaded.store(0, std::memory_order_relaxed);
+            downloadedTotal.store(0, std::memory_order_relaxed);
         }
 
         if (attempt < options.maxRetries && options.retryDelayMilliseconds > 0)
@@ -432,11 +425,12 @@ bool DownloadMulti(const std::string& host,
         }
     }
 
-    std::atomic<long long> downloadedTotal{ 0 };
-    for (const auto& segment : segments)
+    std::vector<std::atomic<long long>> segmentProgresses;
+    segmentProgresses.resize(segments.size());
+    for (size_t i = 0; i < segments.size(); ++i)
     {
-        if (segment.complete)
-            downloadedTotal.fetch_add(segment.end - segment.start + 1, std::memory_order_relaxed);
+        const long long bytes = segments[i].end - segments[i].start + 1;
+        segmentProgresses[i].store(segments[i].complete ? bytes : 0, std::memory_order_relaxed);
     }
 
     std::mutex stateMutex;
@@ -444,6 +438,14 @@ bool DownloadMulti(const std::string& host,
     const auto overallStart = std::chrono::steady_clock::now();
     std::atomic<size_t> nextSegment{ 0 };
     std::atomic<bool> failed{ false };
+
+    const auto aggregateProgress = [&]() -> long long
+    {
+        long long total = 0;
+        for (auto& segmentProgress : segmentProgresses)
+            total += segmentProgress.load(std::memory_order_relaxed);
+        return std::min(total, totalSize);
+    };
 
     const int connectionCount = std::max(1, std::min(options.maxConnections,
                                                      static_cast<int>(segments.size())));
@@ -456,18 +458,16 @@ bool DownloadMulti(const std::string& host,
         if (segment.complete)
             return true;
 
-        const long long segmentBytes = segment.end - segment.start + 1;
         for (int attempt = 0; attempt <= options.maxRetries; ++attempt)
         {
-            std::atomic<long long> segmentProgress{ 0 };
-            std::atomic<bool> completed{ false };
+            segmentProgresses[index].store(0, std::memory_order_relaxed);
 
             bool success = false;
             auto progressProxy = [&](long long, long long)
             {
                 std::lock_guard<std::mutex> lock(callbackMutex);
                 if (progress)
-                    progress(downloadedTotal.load(std::memory_order_relaxed), totalSize);
+                    progress(aggregateProgress(), totalSize);
             };
             auto speedProxy = [&](double)
             {
@@ -476,7 +476,7 @@ bool DownloadMulti(const std::string& host,
                 {
                     const double elapsed = std::chrono::duration<double>(
                         std::chrono::steady_clock::now() - overallStart).count();
-                    const long long current = downloadedTotal.load(std::memory_order_relaxed);
+                    const long long current = aggregateProgress();
                     speedCallback(elapsed > 0.0 ? current / elapsed : 0.0);
                 }
             };
@@ -488,7 +488,7 @@ bool DownloadMulti(const std::string& host,
                 client.set_connection_timeout(options.connectionTimeoutSeconds, 0);
                 success = DownloadRange(client, remotePath, partPath,
                                         segment.start, segment.end,
-                                        downloadedTotal, totalSize,
+                                        segmentProgresses[index],
                                         progressProxy, speedProxy,
                                         overallStart,
                                         options.connectionTimeoutSeconds);
@@ -500,30 +500,25 @@ bool DownloadMulti(const std::string& host,
                 client.set_connection_timeout(options.connectionTimeoutSeconds, 0);
                 success = DownloadRange(client, remotePath, partPath,
                                         segment.start, segment.end,
-                                        downloadedTotal, totalSize,
+                                        segmentProgresses[index],
                                         progressProxy, speedProxy,
                                         overallStart,
                                         options.connectionTimeoutSeconds);
             }
 
-            completed.store(success, std::memory_order_relaxed);
-            if (completed.load(std::memory_order_relaxed))
+            if (success)
             {
                 std::lock_guard<std::mutex> lock(stateMutex);
                 segment.complete = true;
+                segmentProgresses[index].store(
+                    segment.end - segment.start + 1, std::memory_order_relaxed);
+
                 if (!SaveMetadata(metadataPath, totalSize, segmentSize, segments))
                     return false;
                 return true;
             }
 
-            // DownloadRange may have written only part of the segment. Remove
-            // that partial contribution from aggregate progress before retry.
-            const long long partial = segmentProgress.load(std::memory_order_relaxed);
-            if (partial > 0)
-            {
-                const long long current = downloadedTotal.load(std::memory_order_relaxed);
-                downloadedTotal.store(std::max(0LL, current - partial), std::memory_order_relaxed);
-            }
+            segmentProgresses[index].store(0, std::memory_order_relaxed);
 
             if (attempt < options.maxRetries && options.retryDelayMilliseconds > 0)
             {
