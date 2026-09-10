@@ -5,6 +5,7 @@
 #include "VersionManager.h"
 #include "ManifestManager.h"
 #include "FileVerifier.h"
+#include "DownloadManager.h"
 #include <direct.h>
 #include <Shlwapi.h>
 #include <algorithm>
@@ -58,25 +59,7 @@ std::string Helper::GetFileFromURL(int iType)
 
 std::string Helper::GetFileFromURL(const std::string& customPath)
 {
-    auto fetch = [&](auto& cli) -> std::string
-    {
-        cli.set_follow_location(true);
-        cli.set_connection_timeout(5, 0);
-        auto res = cli.Get(customPath.c_str());
-        if (!res || res->status != 200)
-            return "";
-        return res->body;
-    };
-    if (config::IsCDNUsingSSL)
-    {
-        httplib::SSLClient cli(config::LauncherCDN.c_str());
-        return fetch(cli);
-    }
-    else
-    {
-        httplib::Client cli(config::LauncherCDN.c_str());
-        return fetch(cli);
-    }
+    return DownloadManager(config::LauncherCDN, config::IsCDNUsingSSL).Get(customPath);
 }
 
 bool Helper::iequals(const std::string& a, const std::string& b)
@@ -156,58 +139,44 @@ bool Helper::CreateDirectoryIfNotExists(const std::string& dirPath)
 
 bool Helper::DownloadFile(const std::string& remoteFile, const std::string& localPath, int fileIndex, int totalFiles)
 {
-    auto doDownload = [&](auto& cli) -> bool
-    {
-        cli.set_follow_location(true);
-        cli.set_connection_timeout(5, 0);
-        std::ofstream out(localPath, std::ios::binary);
-        if (!out) return false;
-        long downloaded = 0;
-        long contentLength = 0;
-        auto startTime = std::chrono::steady_clock::now();
-        auto res = cli.Get(("/Update/" + remoteFile).c_str(), [&](const httplib::Response& response)
+    DownloadManager manager(config::LauncherCDN, config::IsCDNUsingSSL);
+    const bool result = manager.Download(
+        remoteFile,
+        localPath,
+        [&](long long downloaded, long long contentLength)
         {
-            auto it = response.headers.find("Content-Length");
-            if (it != response.headers.end())
-                contentLength = std::stol(it->second);
-            return true;
-        }, [&](const char* data, size_t len)
-        {
-            out.write(data, len);
-            downloaded += static_cast<long>(len);
             if (contentLength > 0)
-                gui::g_iFileProgress.store(static_cast<float>(downloaded) / contentLength, std::memory_order_relaxed);
-            gui::g_iTotalProgress.store((static_cast<float>(fileIndex - 1) + gui::g_iFileProgress.load()) / totalFiles, std::memory_order_relaxed);
-            auto now = std::chrono::steady_clock::now();
-            double elapsed = std::chrono::duration<double>(now - startTime).count();
-            double speed = elapsed > 0 ? downloaded / elapsed : 0;
+                gui::g_iFileProgress.store(
+                    static_cast<float>(downloaded) / static_cast<float>(contentLength),
+                    std::memory_order_relaxed);
+
+            gui::g_iTotalProgress.store(
+                (static_cast<float>(fileIndex - 1) + gui::g_iFileProgress.load()) / totalFiles,
+                std::memory_order_relaxed);
+        },
+        [&](double bytesPerSecond)
+        {
+            double speed = bytesPerSecond;
             const char* units[] = { "B/s", "KB/s", "MB/s", "GB/s", "TB/s" };
-            int i = 0;
-            while (speed >= 1024 && i < 4)
+            int unit = 0;
+            while (speed >= 1024.0 && unit < 4)
             {
-                speed /= 1024;
-                i++;
+                speed /= 1024.0;
+                ++unit;
             }
+
             std::ostringstream oss;
-            oss << std::fixed << std::setprecision(2) << speed << " " << units[i];
+            oss << std::fixed << std::setprecision(2) << speed << " " << units[unit];
             std::lock_guard<std::mutex> lock(gui::g_SpeedStringMutex);
             gui::g_SpeedString = oss.str();
-            return true;
         });
+
+    {
         std::lock_guard<std::mutex> lock(gui::g_SpeedStringMutex);
         gui::g_SpeedString.clear();
-        return res && res->status == 200;
-    };
-    if (config::IsCDNUsingSSL)
-    {
-        httplib::SSLClient cli(config::LauncherCDN.c_str());
-        return doDownload(cli);
     }
-    else
-    {
-        httplib::Client cli(config::LauncherCDN.c_str());
-        return doDownload(cli);
-    }
+
+    return result;
 }
 
 void Helper::WorkerUpdating(int updateCount)
