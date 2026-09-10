@@ -50,7 +50,7 @@ int main(int argc, char** argv)
     const std::string targetArg = GetArg(argc, argv, "--target");
     const std::string newArg = GetArg(argc, argv, "--new");
     const std::string backupArg = GetArg(argc, argv, "--backup");
-    const std::string hashArg = GetArg(argc, argv, "--sha256");
+    const std::string hashArg = GetArg(argc, argv, "--hash");
     const std::string pidArg = GetArg(argc, argv, "--pid");
     if (targetArg.empty() || newArg.empty() || backupArg.empty() || hashArg.empty())
         return 2;
@@ -60,7 +60,7 @@ int main(int argc, char** argv)
     const std::filesystem::path target(targetArg);
     const std::filesystem::path replacement(newArg);
     const std::filesystem::path backup(backupArg);
-    if (integrity::createSHA256FromFile(replacement.string()) != hashArg)
+    if (integrity::createHashFromFile(replacement.string(), hashArg) != hashArg)
         return 3;
 
     std::error_code error;
