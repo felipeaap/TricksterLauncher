@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Arquivos de Origem"><UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier><Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions></Filter>
@@ -19,6 +19,7 @@
     <ClCompile Include="Config.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Crypt.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="DownloadManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
+    <ClCompile Include="DownloadTelemetry.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="EndpointManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="FileVerifier.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="GameLauncher.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
@@ -28,9 +29,11 @@
     <ClCompile Include="Language.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherApplication.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherUpdater.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
+    <ClCompile Include="LauncherWebView.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherWindow.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Main.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="ManifestManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
+    <ClCompile Include="ManifestSecurity.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="RendererD3D9.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="UpdateCoordinator.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="UpdateInstaller.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
@@ -49,6 +52,7 @@
     <ClInclude Include="Config.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="Crypt.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="DownloadManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
+    <ClInclude Include="DownloadTelemetry.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="EndpointManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="FileVerifier.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="GameLauncher.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
@@ -59,8 +63,10 @@
     <ClInclude Include="Language.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="LauncherApplication.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="LauncherUpdater.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
+    <ClInclude Include="LauncherWebView.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="LauncherWindow.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="ManifestManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
+    <ClInclude Include="ManifestSecurity.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="RendererD3D9.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="resource.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="UpdateCoordinator.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
@@ -68,10 +74,6 @@
     <ClInclude Include="UpdateTypes.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="VersionManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
   </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="NewLauncher.rc"><Filter>Arquivos de Recurso</Filter></ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
+  <ItemGroup><ResourceCompile Include="NewLauncher.rc"><Filter>Arquivos de Recurso</Filter></ResourceCompile></ItemGroup>
+  <ItemGroup><None Include="packages.config" /></ItemGroup>
 </Project>
