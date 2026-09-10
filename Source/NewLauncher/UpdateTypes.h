@@ -8,4 +8,5 @@ struct Arquivo
     std::string FileHash;
     std::string FilePath;
     bool ToUpdate = false;
+    long long FileSize = 0;
 };
