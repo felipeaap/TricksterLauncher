@@ -29,6 +29,11 @@ bool LauncherUpdater::Update(const std::filesystem::path& launcherPath,
     if (!endpoints.Download(remotePath, launcherPath.string()))
         return false;
 
+    const std::string downloadedHash = integrity::createHashFromFile(
+        launcherPath.string(), remoteHash);
+    if (downloadedHash.empty() || downloadedHash != remoteHash)
+        return false;
+
     STARTUPINFOA startupInfo{};
     startupInfo.cb = sizeof(startupInfo);
     PROCESS_INFORMATION processInfo{};
