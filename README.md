@@ -2,10 +2,10 @@ https://github.com/user-attachments/assets/1ee4a782-afbc-4f08-845f-88c6b3453b9b
 
 
 # Trickster-Launcher
-## How to build:​
-1. Have **Visual studio 2022 installed**;​
-2. Make sure you have **Desktop C++** and **ALL the VS22 (143**) components installed;​
-3. Clone this repository, and extract the downloaded .zip in a new folder;​
+## How to build:
+1. Have **Visual studio 2022 installed**;
+2. Make sure you have **Desktop C++** and **ALL the VS22 (143**) components installed;
+3. Clone this repository, and extract the downloaded .zip in a new folder;
 4. Open the **Trickster Launcher** solution;
 5. **Restore the NuGet packages**, by **right-clicking the Launcher project > Manage NuGet Packages > Restore button**;
 6. Change the configs to your liking, in the **Config.cpp** file;
@@ -27,3 +27,6 @@ Your update folder root should be like this:
 Inside the Update folder, you put files like you would in your trickster client, **same folder structure and everything INCLUDING THE SPLASH.EXE!**
 then you just run the **FileListGen.exe** and it is done!
 **Maintenance.txt** is simple, **true** puts the launcher in maintenance mode, **false** puts the launcher in online mode.
+
+## Repository layout
+The launcher source lives under `Source/NewLauncher`, while the standalone `FileListGen` build tool lives under `tools/FileListGen`. Build output and Visual Studio local state are intentionally not part of the repository.
