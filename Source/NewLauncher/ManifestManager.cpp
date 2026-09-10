@@ -32,9 +32,25 @@ bool ValidateConsolidatedManifest(const nlohmann::json& document)
         value,
         config::ManifestPublicKeyPem);
 }
+}
 
-void LoadFilesFromArray(const nlohmann::json& array,
-                        ManifestManager::FileList& files)
+ManifestManager::ManifestManager(FetchFunction fetch)
+    : fetch_(std::move(fetch))
+{
+}
+
+void ManifestManager::MergeFile(FileList& files, const Arquivo& file)
+{
+    const auto it = std::find_if(files.begin(), files.end(),
+        [&](const Arquivo& current) { return IsSamePath(current.FilePath, file.FilePath); });
+
+    if (it != files.end())
+        *it = file;
+    else
+        files.push_back(file);
+}
+
+void LoadFilesFromArray(const nlohmann::json& array, ManifestManager::FileList& files)
 {
     if (!array.is_array())
         return;
@@ -46,33 +62,16 @@ void LoadFilesFromArray(const nlohmann::json& array,
         file.FileHash = item.value("FileHash", "");
         file.FilePath = item.value("FilePath", "");
         file.ToUpdate = item.value("ToUpdate", false);
-        ManifestManager::FileList::value_type copy = file;
+        file.FileSize = item.value("FileSize", 0LL);
 
         const auto it = std::find_if(files.begin(), files.end(),
-            [&](const Arquivo& current)
-            {
-                if (current.FilePath.size() != copy.FilePath.size())
-                    return false;
-                for (size_t i = 0; i < current.FilePath.size(); ++i)
-                {
-                    if (std::tolower(static_cast<unsigned char>(current.FilePath[i])) !=
-                        std::tolower(static_cast<unsigned char>(copy.FilePath[i])))
-                        return false;
-                }
-                return true;
-            });
+            [&](const Arquivo& current) { return ManifestManager::IsSamePath(current.FilePath, file.FilePath); });
 
         if (it != files.end())
-            *it = copy;
+            *it = file;
         else
-            files.push_back(copy);
+            files.push_back(file);
     }
-}
-}
-
-ManifestManager::ManifestManager(FetchFunction fetch)
-    : fetch_(std::move(fetch))
-{
 }
 
 int ManifestManager::Load(FileList& files, bool isFullCheck, int& localVersion)
@@ -80,28 +79,26 @@ int ManifestManager::Load(FileList& files, bool isFullCheck, int& localVersion)
     localVersion = isFullCheck ? 1 : localVersion;
     files.clear();
 
-    // Prefer the new signed/consolidated manifest. The versioned manifests
-    // remain available as a compatibility path during the migration.
     try
     {
         const std::string consolidated = fetch_("/manifest.json");
         if (!consolidated.empty())
         {
             const nlohmann::json document = nlohmann::json::parse(consolidated);
-            if (!ValidateConsolidatedManifest(document))
-                return localVersion;
-
-            const int manifestVersion = document.value("version", localVersion);
-            LoadFilesFromArray(document.value("files", nlohmann::json::array()), files);
-            return manifestVersion;
+            if (ValidateConsolidatedManifest(document))
+            {
+                const int manifestVersion = document.value("version", localVersion);
+                LoadFilesFromArray(document.value("files", nlohmann::json::array()), files);
+                return manifestVersion;
+            }
         }
     }
     catch (const nlohmann::json::exception&)
     {
         files.clear();
-        return localVersion;
     }
 
+    files.clear();
     int currentVersion = localVersion;
     while (true)
     {
@@ -136,21 +133,8 @@ bool ManifestManager::IsSamePath(const std::string& left, const std::string& rig
     {
         if (std::tolower(static_cast<unsigned char>(left[i])) !=
             std::tolower(static_cast<unsigned char>(right[i])))
-        {
             return false;
-        }
     }
 
     return true;
-}
-
-void ManifestManager::MergeFile(FileList& files, const Arquivo& file)
-{
-    const auto it = std::find_if(files.begin(), files.end(),
-        [&](const Arquivo& current) { return IsSamePath(current.FilePath, file.FilePath); });
-
-    if (it != files.end())
-        *it = file;
-    else
-        files.push_back(file);
 }
