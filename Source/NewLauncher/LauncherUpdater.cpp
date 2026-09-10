@@ -1,13 +1,15 @@
 #include "LauncherUpdater.h"
 
-#include <algorithm>
-#include <cctype>
+#include <utility>
 #include <windows.h>
 
-#include "Crypt.h"
+#include "EndpointManager.h"
+#include "Integrity.h"
 
-LauncherUpdater::LauncherUpdater(std::string host, bool useSsl, DownloadManager::Options options)
-    : host_(std::move(host)), useSsl_(useSsl), options_(options)
+LauncherUpdater::LauncherUpdater(std::vector<std::string> hosts,
+                                 bool useSsl,
+                                 DownloadManager::Options options)
+    : hosts_(std::move(hosts)), useSsl_(useSsl), options_(options)
 {
 }
 
@@ -19,12 +21,12 @@ bool LauncherUpdater::Update(const std::filesystem::path& launcherPath,
     if (remoteHash.empty() || currentExecutable.empty())
         return false;
 
-    const std::string localHash = crypt::createMD5FromFile(launcherPath.string());
+    const std::string localHash = integrity::createHashFromFile(launcherPath.string(), remoteHash);
     if (localHash.empty() || localHash == remoteHash)
         return true;
 
-    DownloadManager manager(host_, useSsl_, options_);
-    if (!manager.Download(remotePath, launcherPath.string()))
+    EndpointManager endpoints(hosts_, useSsl_, options_);
+    if (!endpoints.Download(remotePath, launcherPath.string()))
         return false;
 
     STARTUPINFOA startupInfo{};
