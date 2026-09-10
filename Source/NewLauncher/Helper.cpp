@@ -4,10 +4,11 @@
 #include "Language.h"
 #include "VersionManager.h"
 #include "ManifestManager.h"
+#include "FileVerifier.h"
 #include <direct.h>
 #include <Shlwapi.h>
-#include <execution>
-#include <semaphore>
+#include <algorithm>
+#include <cctype>
 
 Helper::Helper()
 {
@@ -87,44 +88,26 @@ bool Helper::iequals(const std::string& a, const std::string& b)
     return true;
 }
 
-constexpr int MAX_CONCURRENT = 8;
-std::counting_semaphore<MAX_CONCURRENT> sem(MAX_CONCURRENT);
-
 void Helper::FileCheckUpdate()
 {
     gui::g_iFileProgress.store(1.0, std::memory_order_relaxed);
-    std::atomic<int> count{ 0 };
-    std::atomic<int> updates{ 0 };
-    std::for_each(std::execution::par_unseq, ListaArquivos.begin(), ListaArquivos.end(), [&](Arquivo& file)
+
+    FileVerifier verifier([&](size_t current, size_t total, const Arquivo& file)
     {
-        sem.acquire();
-        bool doesFileExists = std::ifstream(file.FilePath).good();
-        if (!doesFileExists)
-        {
-            file.ToUpdate = true;
-            updates.fetch_add(1, std::memory_order_relaxed);
-        }
-        else
-        {
-            std::string fileHash = crypt::createMD5FromFile(file.FilePath);
-            if (fileHash != file.FileHash)
-            {
-                file.ToUpdate = true;
-                updates.fetch_add(1, std::memory_order_relaxed);
-            }
-        }
-        count.fetch_add(1, std::memory_order_relaxed);
-        float launcherPercent = static_cast<float>(count.load()) / static_cast<float>(ListaArquivos.size());
+        float launcherPercent = total > 0
+            ? static_cast<float>(current) / static_cast<float>(total)
+            : 1.0f;
         launcherPercent = std::min(launcherPercent, 1.0f);
+
         std::string fileName = file.FilePath.substr(file.FilePath.find_last_of("/\\") + 1);
         gui::g_iTotalProgress.store(launcherPercent, std::memory_order_relaxed);
         {
             std::lock_guard<std::mutex> lock(gui::g_FileStringMutex);
             gui::g_FileString = lang::GetString("splash_check") + fileName;
         }
-        sem.release();
     });
-    updateCount = updates.load();
+
+    updateCount = verifier.CountUpdates(ListaArquivos);
     WorkerUpdating(updateCount);
     isWorkerDone = true;
     SaveLocalVersion(currentVersion);
@@ -256,9 +239,7 @@ void Helper::WorkerUpdating(int updateCount)
     {
         std::lock_guard<std::mutex> lockFile(gui::g_FileStringMutex);
         if (!isMaintenance)
-        {
             gui::g_FileString = lang::GetString("launcher_worker_complete");
-        }
         else
             gui::g_FileString = lang::GetString("launcher_worker_maintenance");
     }
