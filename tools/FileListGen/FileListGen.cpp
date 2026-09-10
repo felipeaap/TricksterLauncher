@@ -8,16 +8,19 @@
 #include <sstream>
 #include <map>
 #include <algorithm>
-#include <openssl/evp.h>
-#include "json.hpp"
 #include <future>
 #include <semaphore>
+#include <cctype>
+
+#include "json.hpp"
+#include "ManifestSecurity.h"
+#include "openssl/evp.h"
 
 using json = nlohmann::json;
 
 struct Arquivo
 {
-    int FileID;
+    int FileID = 0;
     std::string FileHash;
     std::string FilePath;
     bool ToUpdate = false;
@@ -26,80 +29,108 @@ struct Arquivo
 std::wstring utf8ToUtf16(const std::string& str)
 {
     if (str.empty()) return L"";
-    int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.size(), nullptr, 0);
-    std::wstring wstr(sizeNeeded, 0);
-    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.size(), &wstr[0], sizeNeeded);
+    const int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), static_cast<int>(str.size()), nullptr, 0);
+    std::wstring wstr(sizeNeeded, L'\0');
+    if (sizeNeeded > 0)
+        MultiByteToWideChar(CP_UTF8, 0, str.c_str(), static_cast<int>(str.size()), wstr.data(), sizeNeeded);
     return wstr;
 }
 
-std::string utf16ToUtf8(const std::wstring& wstr)
+std::string NormalizePath(const std::string& value)
 {
-    if (wstr.empty()) return "";
-    int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), nullptr, 0, nullptr, nullptr);
-    std::string str(sizeNeeded, 0);
-    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), &str[0], sizeNeeded, nullptr, nullptr);
-    return str;
+    std::string normalized = value;
+    std::replace(normalized.begin(), normalized.end(), '\\', '/');
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c)
+    {
+        return static_cast<char>(std::tolower(c));
+    });
+    return normalized;
 }
 
-std::string createMD5FromFileW(const std::wstring& filePath) noexcept
+std::string CreateSHA256FromFileW(const std::wstring& filePath) noexcept
 {
-    HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    HANDLE hFile = CreateFileW(
+        filePath.c_str(),
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
+
     if (hFile == INVALID_HANDLE_VALUE)
     {
         std::wcerr << L"[ERROR] Could not open file: " << filePath << std::endl;
         return {};
     }
-    LARGE_INTEGER fileSize;
-    if (!GetFileSizeEx(hFile, &fileSize))
-    {
-        CloseHandle(hFile);
-        return {};
-    }
-    if (fileSize.QuadPart == 0)
-    {
-        CloseHandle(hFile);
-        return {};
-    }
-    std::vector<unsigned char> buffer((size_t)fileSize.QuadPart);
-    DWORD bytesRead;
-    if (!ReadFile(hFile, buffer.data(), (DWORD)buffer.size(), &bytesRead, nullptr))
-    {
-        CloseHandle(hFile);
-        return {};
-    }
-    CloseHandle(hFile);
+
     EVP_MD_CTX* context = EVP_MD_CTX_new();
-    if (!context) return {};
-    const EVP_MD* md = EVP_md5();
-    unsigned char digest[EVP_MAX_MD_SIZE];
-    unsigned int digest_len = 0;
-    EVP_DigestInit_ex(context, md, nullptr);
-    EVP_DigestUpdate(context, buffer.data(), buffer.size());
-    EVP_DigestFinal_ex(context, digest, &digest_len);
+    if (!context)
+    {
+        CloseHandle(hFile);
+        return {};
+    }
+
+    unsigned char digest[EVP_MAX_MD_SIZE]{};
+    unsigned int digestLength = 0;
+    std::array<unsigned char, 1024 * 1024> buffer{};
+    bool success = EVP_DigestInit_ex(context, EVP_sha256(), nullptr) == 1;
+
+    while (success)
+    {
+        DWORD bytesRead = 0;
+        if (!ReadFile(hFile, buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
+        {
+            success = false;
+            break;
+        }
+
+        if (bytesRead == 0)
+            break;
+
+        success = EVP_DigestUpdate(context, buffer.data(), bytesRead) == 1;
+    }
+
+    if (success)
+        success = EVP_DigestFinal_ex(context, digest, &digestLength) == 1;
+
     EVP_MD_CTX_free(context);
-    std::ostringstream oss;
-    for (unsigned int i = 0; i < digest_len; ++i)
-        oss << std::hex << std::setw(2) << std::setfill('0') << (int)digest[i];
-    return oss.str();
+    CloseHandle(hFile);
+
+    if (!success)
+        return {};
+
+    std::ostringstream result;
+    result << std::hex << std::setfill('0');
+    for (unsigned int i = 0; i < digestLength; ++i)
+        result << std::setw(2) << static_cast<unsigned int>(digest[i]);
+    return result.str();
 }
 
-void listarArquivosRecursivo(const std::string& basePath, const std::string& subPath, std::vector<std::string>& arquivos) noexcept
+void listarArquivosRecursivo(const std::string& basePath,
+                             const std::string& subPath,
+                             std::vector<std::string>& arquivos) noexcept
 {
-    std::string busca = basePath + "\\" + subPath + "\\*";
-    WIN32_FIND_DATAA fd;
+    const std::string busca = basePath + "\\" + subPath + "\\*";
+    WIN32_FIND_DATAA fd{};
     HANDLE hFind = FindFirstFileA(busca.c_str(), &fd);
-    if (hFind == INVALID_HANDLE_VALUE) return;
+    if (hFind == INVALID_HANDLE_VALUE)
+        return;
+
     do
     {
-        std::string nome = fd.cFileName;
-        if (nome == "." || nome == "..") continue;
-        std::string caminhoRelativo = subPath.empty() ? nome : (subPath + "\\" + nome);
+        const std::string nome = fd.cFileName;
+        if (nome == "." || nome == "..")
+            continue;
+
+        const std::string caminhoRelativo = subPath.empty() ? nome : (subPath + "\\" + nome);
         if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             listarArquivosRecursivo(basePath, caminhoRelativo, arquivos);
         else
             arquivos.push_back(caminhoRelativo);
     }
     while (FindNextFileA(hFind, &fd));
+
     FindClose(hFind);
 }
 
@@ -107,170 +138,232 @@ enum class ExecMode { Sequential, Parallel };
 
 std::vector<Arquivo> gerarListaArquivos(const std::string& pastaRaiz, ExecMode modo) noexcept
 {
-    std::string launcherName = "splash.";
     constexpr int maxThreads = 8;
     std::counting_semaphore<maxThreads> sem(maxThreads);
     std::vector<std::string> caminhosRelativos;
     listarArquivosRecursivo(pastaRaiz, "", caminhosRelativos);
+
+    std::vector<std::string> caminhosValidos;
+    caminhosValidos.reserve(caminhosRelativos.size());
+    for (const auto& relPath : caminhosRelativos)
+    {
+        if (NormalizePath(relPath).find("splash.") != std::string::npos)
+            continue;
+        caminhosValidos.push_back(relPath);
+    }
+
     std::vector<Arquivo> arquivos;
-    arquivos.reserve(caminhosRelativos.size());
-    int fileID = 1;
+    arquivos.reserve(caminhosValidos.size());
+
     if (modo == ExecMode::Sequential)
     {
-        for (const auto& relPath : caminhosRelativos)
+        int fileID = 1;
+        for (const auto& relPath : caminhosValidos)
         {
-            std::string caminhoLower = relPath;
-            std::transform(caminhoLower.begin(), caminhoLower.end(), caminhoLower.begin(), [](unsigned char c) { return std::tolower(c); });
-            if (caminhoLower.find(launcherName) != std::string::npos)
+            const auto hash = CreateSHA256FromFileW(utf8ToUtf16(pastaRaiz + "\\" + relPath));
+            if (hash.empty())
                 continue;
-            std::wstring wFullPath = utf8ToUtf16(pastaRaiz + "\\" + relPath);
-            std::string md5 = createMD5FromFileW(wFullPath);
-            arquivos.push_back(Arquivo{
-                fileID++, md5, relPath, false
-            });
+            arquivos.push_back({fileID++, hash, relPath, false});
         }
+        return arquivos;
     }
-    else
+
+    std::vector<std::future<std::string>> futures;
+    futures.reserve(caminhosValidos.size());
+    for (const auto& relPath : caminhosValidos)
     {
-        std::vector<std::future<std::string>> futuros;
-        std::vector<std::string> caminhosValidos;
-        for (const auto& relPath : caminhosRelativos)
+        const std::wstring fullPath = utf8ToUtf16(pastaRaiz + "\\" + relPath);
+        sem.acquire();
+        futures.emplace_back(std::async(std::launch::async, [fullPath, &sem]()
         {
-            std::string caminhoLower = relPath;
-            std::transform(caminhoLower.begin(), caminhoLower.end(), caminhoLower.begin(), [](unsigned char c) { return std::tolower(c); });
-            if (caminhoLower.find(launcherName) != std::string::npos)
-                continue;
-            std::wstring wFullPath = utf8ToUtf16(pastaRaiz + "\\" + relPath);
-            caminhosValidos.push_back(relPath);
-            sem.acquire();
-            futuros.emplace_back(std::async(std::launch::async, [wFullPath, &sem]() {
-                auto md5 = createMD5FromFileW(wFullPath);
-                sem.release();
-                return md5;
-            }));
-        }
-        for (size_t i = 0; i < caminhosValidos.size(); ++i)
-        {
-            std::string md5 = futuros[i].get();
-            arquivos.push_back(Arquivo{
-                fileID++, md5, caminhosValidos[i], false
-            });
-        }
+            const auto hash = CreateSHA256FromFileW(fullPath);
+            sem.release();
+            return hash;
+        }));
     }
+
+    int fileID = 1;
+    for (size_t i = 0; i < caminhosValidos.size(); ++i)
+    {
+        const auto hash = futures[i].get();
+        if (!hash.empty())
+            arquivos.push_back({fileID++, hash, caminhosValidos[i], false});
+    }
+
     return arquivos;
 }
 
-std::map<std::string, Arquivo> carregarVersoesAntigas(const std::string& pastaVersion)
+std::map<std::string, Arquivo> carregarArquivosAntigos(const std::string& pastaVersion)
 {
     std::map<std::string, Arquivo> arquivos;
-    WIN32_FIND_DATAA fd;
+    WIN32_FIND_DATAA fd{};
     HANDLE hFind = FindFirstFileA((pastaVersion + "\\*.json").c_str(), &fd);
     if (hFind == INVALID_HANDLE_VALUE)
         return arquivos;
+
     do
     {
         std::ifstream f(pastaVersion + "\\" + fd.cFileName);
-        if (!f) continue;
-        json j;
-        f >> j;
-        for (auto& entry : j)
+        if (!f)
+            continue;
+
+        try
         {
-            Arquivo arq;
-            arq.FileID = entry["FileID"];
-            arq.FileHash = entry["FileHash"];
-            arq.FilePath = entry["FilePath"];
-            arquivos[arq.FilePath] = arq;
+            json document;
+            f >> document;
+            if (document.is_object())
+                document = document.value("files", json::array());
+
+            if (!document.is_array())
+                continue;
+
+            for (const auto& entry : document)
+            {
+                Arquivo arq;
+                arq.FileID = entry.value("FileID", 0);
+                arq.FileHash = entry.value("FileHash", "");
+                arq.FilePath = entry.value("FilePath", "");
+                arq.ToUpdate = entry.value("ToUpdate", false);
+                arquivos[NormalizePath(arq.FilePath)] = arq;
+            }
+        }
+        catch (const json::exception&)
+        {
+            continue;
         }
     }
     while (FindNextFileA(hFind, &fd));
+
     FindClose(hFind);
     return arquivos;
-}
-
-std::vector<Arquivo> comparar(const std::map<std::string, Arquivo>& antigos, const std::vector<Arquivo>& novos)
-{
-    std::vector<Arquivo> resultado;
-    for (auto& novo : novos) {
-        auto it = antigos.find(novo.FilePath);
-        if (it == antigos.end() || it->second.FileHash != novo.FileHash)
-            resultado.push_back(novo);
-    }
-    return resultado;
 }
 
 int proximaVersao(const std::string& pastaVersion)
 {
     int maior = 0;
-    WIN32_FIND_DATAA fd;
-    HANDLE hFind = FindFirstFileA((pastaVersion + "\\*.json").c_str(), &fd);
-    if (hFind == INVALID_HANDLE_VALUE) return 1;
-    do {
-        std::string nome = fd.cFileName;
+    WIN32_FIND_DATAA fd{};
+    HANDLE hFind = FindFirstFileA((pastaVersion + "\\version_*.json").c_str(), &fd);
+    if (hFind == INVALID_HANDLE_VALUE)
+        return 1;
+
+    do
+    {
         int v = 0;
-        if (sscanf_s(nome.c_str(), "version_%d.json", &v) == 1)
+        if (sscanf_s(fd.cFileName, "version_%d.json", &v) == 1)
             maior = std::max(maior, v);
     }
     while (FindNextFileA(hFind, &fd));
+
     FindClose(hFind);
     return maior + 1;
 }
 
-void salvarVersao(const std::string& pastaVersion, int versao, const std::vector<Arquivo>& arquivos)
+void salvarVersaoLegada(const std::string& pastaVersion,
+                        int versao,
+                        const std::vector<Arquivo>& arquivos)
 {
-    json jArray = json::array();
+    json document = json::array();
     for (const auto& arq : arquivos)
     {
-        jArray.push_back({
+        document.push_back({
             {"FileID", arq.FileID},
             {"FileHash", arq.FileHash},
             {"FilePath", arq.FilePath},
             {"ToUpdate", arq.ToUpdate}
         });
     }
+
     std::ostringstream nome;
     nome << pastaVersion << "\\version_" << versao << ".json";
-    std::ofstream outFile(nome.str());
-    outFile << jArray.dump(4);
+    std::ofstream output(nome.str(), std::ios::binary);
+    if (output)
+        output << document.dump(4);
+}
+
+bool salvarManifesto(const std::vector<Arquivo>& arquivos,
+                     int versao,
+                     const std::string& privateKeyPath)
+{
+    json document;
+    document["version"] = versao;
+    document["algorithm"] = "sha256";
+    document["files"] = json::array();
+
+    for (const auto& arq : arquivos)
+    {
+        document["files"].push_back({
+            {"FileID", arq.FileID},
+            {"FileHash", arq.FileHash},
+            {"FilePath", arq.FilePath},
+            {"ToUpdate", arq.ToUpdate}
+        });
+    }
+
+    if (!privateKeyPath.empty())
+    {
+        std::ifstream keyFile(privateKeyPath, std::ios::binary);
+        std::stringstream keyBuffer;
+        keyBuffer << keyFile.rdbuf();
+        const std::string signature = manifest_security::Sign(document.dump(), keyBuffer.str());
+        if (signature.empty())
+        {
+            std::cerr << "[ERROR] Could not sign manifest." << std::endl;
+            return false;
+        }
+
+        document["signature"] = {
+            {"algorithm", "SHA256"},
+            {"value", signature}
+        };
+    }
+
+    std::ofstream output("manifest.json", std::ios::binary);
+    if (!output)
+        return false;
+
+    output << document.dump(4);
+    return output.good();
 }
 
 void salvarLauncherHash(const std::string& caminhoSplash)
 {
-    std::wstring wPath = utf8ToUtf16(caminhoSplash);
-    std::ofstream outLauncher("launcher.txt");
+    const std::string hash = CreateSHA256FromFileW(utf8ToUtf16(caminhoSplash));
+    std::ofstream outLauncher("launcher.txt", std::ios::binary);
     if (outLauncher)
-        outLauncher << createMD5FromFileW(wPath);
+        outLauncher << hash;
 }
 
 int main(int argc, char* argv[])
 {
     ExecMode modo = ExecMode::Parallel;
-    if (argc > 1)
-    {
-        std::string arg = argv[1];
-        if (arg == "sequential")
-            modo = ExecMode::Sequential;
-    }
+    if (argc > 1 && std::string(argv[1]) == "sequential")
+        modo = ExecMode::Sequential;
+
+    const std::string privateKeyPath = argc > 2 ? argv[2] : std::string{};
+
     std::cout << "Loading current version files..." << std::endl;
-    auto antigos = carregarVersoesAntigas("version");
-    std::cout << "---------------------------------" << std::endl;
-    std::cout << "Creating file list..." << std::endl;
-    auto novos = gerarListaArquivos("Update", modo);
-    std::cout << "---------------------------------" << std::endl;
-    std::cout << "Checking for file MD5 changes..." << std::endl;
-    auto resultado = comparar(antigos, novos);
-    if (!resultado.empty())
+    const auto antigos = carregarArquivosAntigos("version");
+
+    std::cout << "Creating SHA-256 file list..." << std::endl;
+    const auto novos = gerarListaArquivos("Update", modo);
+
+    std::vector<Arquivo> alterados;
+    for (const auto& novo : novos)
     {
-        std::cout << "---------------------------------" << std::endl;
-        std::cout << "Building version JSON..." << std::endl;
-        int versao = proximaVersao("version");
-        std::cout << "---------------------------------" << std::endl;
-        std::cout << "Saving JSON version to file..." << std::endl;
-        salvarVersao("version", versao, resultado);
+        const auto it = antigos.find(NormalizePath(novo.FilePath));
+        if (it == antigos.end() || it->second.FileHash != novo.FileHash)
+            alterados.push_back(novo);
     }
-    std::cout << "---------------------------------" << std::endl;
-    std::cout << "Calculating current Splash MD5..." << std::endl;
+
+    const int versao = proximaVersao("version");
+    if (!alterados.empty())
+        salvarVersaoLegada("version", versao, alterados);
+
+    if (!salvarManifesto(novos, versao, privateKeyPath))
+        return 1;
+
     salvarLauncherHash("Update\\Splash.exe");
-    std::cout << "---------------------------------" << std::endl;
-    system("pause");
+
+    std::cout << "Manifest written using SHA-256" << std::endl;
     return 0;
 }
