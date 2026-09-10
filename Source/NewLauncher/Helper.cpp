@@ -6,6 +6,7 @@
 #include "ManifestManager.h"
 #include "FileVerifier.h"
 #include "DownloadManager.h"
+#include "UpdateCoordinator.h"
 #include <direct.h>
 #include <Shlwapi.h>
 #include <algorithm>
@@ -98,21 +99,40 @@ void Helper::FileCheckUpdate()
 
 void Helper::CheckWorker(bool isFullCheck)
 {
-    ParseVersionedFileLists(isFullCheck);
     if (!ListaArquivos.empty() && !isWorkerDone)
+        return;
+
+    if (workerThread.joinable())
+        workerThread.join();
+
+    isWorkerDone = false;
+    workerThread = std::thread([this, isFullCheck]()
     {
-        if (workerThread.joinable())
-            workerThread.join();
-        workerThread = std::thread(&Helper::FileCheckUpdate, this);
-    }
-    else
-    {
-        std::lock_guard<std::mutex> lockFile(gui::g_FileStringMutex);
-        gui::g_FileString = lang::GetString("launcher_worker_complete");
-        gui::g_iFileProgress.store(1.f, std::memory_order_relaxed);
-        gui::g_iTotalProgress.store(1.f, std::memory_order_relaxed);
+        UpdateCoordinator coordinator(
+            [this](const std::string& path) {
+                return GetFileFromURL(path);
+            },
+            [](const std::string& fileName)
+            {
+                std::lock_guard<std::mutex> lock(gui::g_FileStringMutex);
+                gui::g_FileString = lang::GetString("splash_check") + fileName;
+            },
+            [](float fileProgress, float totalProgress)
+            {
+                gui::g_iFileProgress.store(fileProgress, std::memory_order_relaxed);
+                gui::g_iTotalProgress.store(totalProgress, std::memory_order_relaxed);
+            });
+
+        {
+            std::lock_guard<std::mutex> lock(gui::g_FileStringMutex);
+            gui::g_FileString = lang::GetString("launcher_filelist_building");
+        }
+
+        coordinator.Check(ListaArquivos, isFullCheck, localVersion, currentVersion, updateCount);
+        WorkerUpdating(updateCount);
         isWorkerDone = true;
-    }
+        SaveLocalVersion(currentVersion);
+    });
 }
 
 std::string Helper::GetDirectoryFromPath(const std::string& filepath)
