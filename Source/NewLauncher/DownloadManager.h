@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <string>
 
@@ -14,6 +15,9 @@ public:
         int maxRetries = 3;
         int connectionTimeoutSeconds = 5;
         int retryDelayMilliseconds = 500;
+        int maxConnections = 4;
+        long long multiConnectionThresholdBytes = 8LL * 1024 * 1024;
+        long long segmentSizeBytes = 4LL * 1024 * 1024;
     };
 
     DownloadManager(std::string host, bool useSsl, Options options = {});
