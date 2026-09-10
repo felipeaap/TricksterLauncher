@@ -25,6 +25,7 @@ struct Arquivo
     std::string FileHash;
     std::string FilePath;
     bool ToUpdate = false;
+    long long FileSize = 0;
 };
 
 std::wstring utf8ToUtf16(const std::string& str)
@@ -46,6 +47,18 @@ std::string NormalizePath(const std::string& value)
         return static_cast<char>(std::tolower(c));
     });
     return normalized;
+}
+
+long long GetFileSizeW(const std::wstring& filePath) noexcept
+{
+    WIN32_FILE_ATTRIBUTE_DATA data{};
+    if (!GetFileAttributesExW(filePath.c_str(), GetFileExInfoStandard, &data))
+        return 0;
+
+    ULARGE_INTEGER size{};
+    size.HighPart = data.nFileSizeHigh;
+    size.LowPart = data.nFileSizeLow;
+    return static_cast<long long>(size.QuadPart);
 }
 
 std::string CreateSHA256FromFileW(const std::wstring& filePath) noexcept
@@ -156,15 +169,20 @@ std::vector<Arquivo> gerarListaArquivos(const std::string& pastaRaiz, ExecMode m
     std::vector<Arquivo> arquivos;
     arquivos.reserve(caminhosValidos.size());
 
+    auto makeArquivo = [&](int fileID, const std::string& relPath, const std::string& hash)
+    {
+        const std::wstring fullPath = utf8ToUtf16(pastaRaiz + "\\" + relPath);
+        arquivos.push_back({fileID, hash, relPath, false, GetFileSizeW(fullPath)});
+    };
+
     if (modo == ExecMode::Sequential)
     {
         int fileID = 1;
         for (const auto& relPath : caminhosValidos)
         {
             const auto hash = CreateSHA256FromFileW(utf8ToUtf16(pastaRaiz + "\\" + relPath));
-            if (hash.empty())
-                continue;
-            arquivos.push_back({fileID++, hash, relPath, false});
+            if (!hash.empty())
+                makeArquivo(fileID++, relPath, hash);
         }
         return arquivos;
     }
@@ -188,7 +206,7 @@ std::vector<Arquivo> gerarListaArquivos(const std::string& pastaRaiz, ExecMode m
     {
         const auto hash = futures[i].get();
         if (!hash.empty())
-            arquivos.push_back({fileID++, hash, caminhosValidos[i], false});
+            makeArquivo(fileID++, caminhosValidos[i], hash);
     }
 
     return arquivos;
@@ -214,7 +232,6 @@ std::map<std::string, Arquivo> carregarArquivosAntigos(const std::string& pastaV
             f >> document;
             if (document.is_object())
                 document = document.value("files", json::array());
-
             if (!document.is_array())
                 continue;
 
@@ -225,6 +242,7 @@ std::map<std::string, Arquivo> carregarArquivosAntigos(const std::string& pastaV
                 arq.FileHash = entry.value("FileHash", "");
                 arq.FilePath = entry.value("FilePath", "");
                 arq.ToUpdate = entry.value("ToUpdate", false);
+                arq.FileSize = entry.value("FileSize", 0LL);
                 arquivos[NormalizePath(arq.FilePath)] = arq;
             }
         }
@@ -270,7 +288,8 @@ void salvarVersaoLegada(const std::string& pastaVersion,
             {"FileID", arq.FileID},
             {"FileHash", arq.FileHash},
             {"FilePath", arq.FilePath},
-            {"ToUpdate", arq.ToUpdate}
+            {"ToUpdate", arq.ToUpdate},
+            {"FileSize", arq.FileSize}
         });
     }
 
@@ -296,13 +315,17 @@ bool salvarManifesto(const std::vector<Arquivo>& arquivos,
             {"FileID", arq.FileID},
             {"FileHash", arq.FileHash},
             {"FilePath", arq.FilePath},
-            {"ToUpdate", arq.ToUpdate}
+            {"ToUpdate", arq.ToUpdate},
+            {"FileSize", arq.FileSize}
         });
     }
 
     if (!privateKeyPath.empty())
     {
         std::ifstream keyFile(privateKeyPath, std::ios::binary);
+        if (!keyFile)
+            return false;
+
         std::stringstream keyBuffer;
         keyBuffer << keyFile.rdbuf();
         const std::string signature = manifest_security::Sign(document.dump(), keyBuffer.str());
@@ -342,17 +365,15 @@ int main(int argc, char* argv[])
 
     const std::string privateKeyPath = argc > 2 ? argv[2] : std::string{};
 
-    std::cout << "Loading current version files..." << std::endl;
     const auto antigos = carregarArquivosAntigos("version");
-
-    std::cout << "Creating SHA-256 file list..." << std::endl;
     const auto novos = gerarListaArquivos("Update", modo);
 
     std::vector<Arquivo> alterados;
     for (const auto& novo : novos)
     {
         const auto it = antigos.find(NormalizePath(novo.FilePath));
-        if (it == antigos.end() || it->second.FileHash != novo.FileHash)
+        if (it == antigos.end() || it->second.FileHash != novo.FileHash ||
+            it->second.FileSize != novo.FileSize)
             alterados.push_back(novo);
     }
 
@@ -364,6 +385,5 @@ int main(int argc, char* argv[])
         return 1;
 
     salvarLauncherHash("Update\\Splash.exe");
-    std::cout << "Manifest written using SHA-256" << std::endl;
     return 0;
 }
