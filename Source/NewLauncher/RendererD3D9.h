@@ -20,4 +20,5 @@ private:
     PDIRECT3D9& d3d_;
     LPDIRECT3DDEVICE9& device_;
     D3DPRESENT_PARAMETERS& presentParameters_;
+    bool sceneBegun_ = false;
 };
