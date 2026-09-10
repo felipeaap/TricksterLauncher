@@ -1,23 +1,22 @@
 #include "Helper.h"
-#include "Gui.h"
+
 #include "Config.h"
-#include "Language.h"
-#include "VersionManager.h"
-#include "ManifestManager.h"
-#include "FileVerifier.h"
-#include "DownloadManager.h"
 #include "EndpointManager.h"
-#include "UpdateCoordinator.h"
+#include "FileVerifier.h"
 #include "GameLauncher.h"
+#include "Gui.h"
+#include "Language.h"
 #include "LauncherUpdater.h"
-#include <direct.h>
-#include <Shlwapi.h>
+#include "ManifestManager.h"
+#include "UpdateCoordinator.h"
+#include "UpdateInstaller.h"
+#include "VersionManager.h"
+
 #include <algorithm>
 #include <cctype>
-#include <iomanip>
 #include <mutex>
-#include <sstream>
 #include <unordered_map>
+#include <windows.h>
 
 namespace
 {
@@ -37,16 +36,7 @@ std::vector<std::string> GetEndpoints()
 }
 }
 
-Helper::Helper()
-{
-    isMaintenance = false;
-    isWorkerDone = false;
-    g_PopupPage = 0;
-    updateCount = 0;
-    ListaArquivos.clear();
-    localVersion = 0;
-    currentVersion = 0;
-}
+Helper::Helper() = default;
 
 void Helper::GetLocalVersion()
 {
@@ -66,7 +56,8 @@ void Helper::ParseVersionedFileLists(bool isFullCheck)
     std::lock_guard<std::mutex> lockFile(gui::g_FileStringMutex);
     gui::g_FileString = lang::GetString("launcher_filelist_building");
 
-    ManifestManager manifests([this](const std::string& path) {
+    ManifestManager manifests([this](const std::string& path)
+    {
         return GetFileFromURL(path);
     });
 
@@ -79,8 +70,9 @@ std::string Helper::GetFileFromURL(int iType)
         {0, "/maintenance.txt"},
         {1, "/launcher.txt"}
     };
-    std::string path = paths.count(iType) ? paths.at(iType) : "/maintenance.txt";
-    return GetFileFromURL(path);
+
+    const auto it = paths.find(iType);
+    return GetFileFromURL(it != paths.end() ? it->second : "/maintenance.txt");
 }
 
 std::string Helper::GetFileFromURL(const std::string& customPath)
@@ -91,16 +83,22 @@ std::string Helper::GetFileFromURL(const std::string& customPath)
 
 bool Helper::iequals(const std::string& a, const std::string& b)
 {
-    if (a.size() != b.size()) return false;
+    if (a.size() != b.size())
+        return false;
+
     for (size_t i = 0; i < a.size(); ++i)
-        if (std::tolower(static_cast<unsigned char>(a[i])) != std::tolower(static_cast<unsigned char>(b[i])))
+    {
+        if (std::tolower(static_cast<unsigned char>(a[i])) !=
+            std::tolower(static_cast<unsigned char>(b[i])))
             return false;
+    }
+
     return true;
 }
 
 void Helper::FileCheckUpdate()
 {
-    gui::g_iFileProgress.store(1.0, std::memory_order_relaxed);
+    gui::g_iFileProgress.store(1.0f, std::memory_order_relaxed);
 
     FileVerifier verifier([&](size_t current, size_t total, const Arquivo& file)
     {
@@ -109,7 +107,9 @@ void Helper::FileCheckUpdate()
             : 1.0f;
         launcherPercent = std::min(launcherPercent, 1.0f);
 
-        std::string fileName = file.FilePath.substr(file.FilePath.find_last_of("/\\") + 1);
+        const std::string fileName =
+            file.FilePath.substr(file.FilePath.find_last_of("/\\") + 1);
+
         gui::g_iTotalProgress.store(launcherPercent, std::memory_order_relaxed);
         {
             std::lock_guard<std::mutex> lock(gui::g_FileStringMutex);
@@ -119,24 +119,25 @@ void Helper::FileCheckUpdate()
 
     updateCount = verifier.CountUpdates(ListaArquivos);
     const bool success = WorkerUpdating(updateCount);
-    isWorkerDone = success;
+    isWorkerDone.store(success, std::memory_order_release);
     if (success)
         SaveLocalVersion(currentVersion);
 }
 
 void Helper::CheckWorker(bool isFullCheck)
 {
-    if (!ListaArquivos.empty() && !isWorkerDone)
+    if (!ListaArquivos.empty() && !isWorkerDone.load(std::memory_order_acquire))
         return;
 
     if (workerThread.joinable())
         workerThread.join();
 
-    isWorkerDone = false;
+    isWorkerDone.store(false, std::memory_order_release);
     workerThread = std::thread([this, isFullCheck]()
     {
         UpdateCoordinator coordinator(
-            [this](const std::string& path) {
+            [this](const std::string& path)
+            {
                 return GetFileFromURL(path);
             },
             [](const std::string& fileName)
@@ -155,56 +156,39 @@ void Helper::CheckWorker(bool isFullCheck)
             gui::g_FileString = lang::GetString("launcher_filelist_building");
         }
 
-        coordinator.Check(ListaArquivos, isFullCheck, localVersion, currentVersion, updateCount);
+        coordinator.Check(
+            ListaArquivos,
+            isFullCheck,
+            localVersion,
+            currentVersion,
+            updateCount);
+
         const bool success = WorkerUpdating(updateCount);
-        isWorkerDone = success;
+        isWorkerDone.store(success, std::memory_order_release);
         if (success)
             SaveLocalVersion(currentVersion);
     });
 }
 
-std::string Helper::GetDirectoryFromPath(const std::string& filepath)
+bool Helper::WorkerUpdating(int pendingUpdateCount)
 {
-    size_t pos = filepath.find_last_of("/\\");
-    return (pos != std::string::npos) ? filepath.substr(0, pos) : "";
-}
+    gui::g_iTotalProgress.store(0.0f, std::memory_order_relaxed);
 
-bool Helper::CreateDirectoryIfNotExists(const std::string& dirPath)
-{
-    std::string fixedDirPath = dirPath;
-    std::replace(fixedDirPath.begin(), fixedDirPath.end(), '\\', '/');
-    std::istringstream iss(fixedDirPath);
-    std::string token;
-    std::string path;
-    while (std::getline(iss, token, '/'))
-    {
-        if (token.empty()) continue;
-        path += token + "/";
-        _mkdir(path.c_str());
-    }
-    return true;
-}
-
-bool Helper::DownloadFile(const std::string& remoteFile, const std::string& localPath, int fileIndex, int totalFiles)
-{
-    EndpointManager endpoints(GetEndpoints(), config::IsCDNUsingSSL);
-    const bool result = endpoints.Download(
-        remoteFile,
-        localPath,
-        [&](long long downloaded, long long contentLength)
+    UpdateInstaller installer(GetEndpoints(), config::IsCDNUsingSSL);
+    const bool result = installer.Install(
+        ListaArquivos,
+        pendingUpdateCount,
+        [](float fileProgress, float totalProgress)
         {
-            if (contentLength > 0)
-                gui::g_iFileProgress.store(
-                    static_cast<float>(downloaded) / static_cast<float>(contentLength),
-                    std::memory_order_relaxed);
-
-            gui::g_iTotalProgress.store(
-                totalFiles > 0
-                    ? (static_cast<float>(fileIndex - 1) + gui::g_iFileProgress.load()) / totalFiles
-                    : 1.0f,
-                std::memory_order_relaxed);
+            gui::g_iFileProgress.store(fileProgress, std::memory_order_relaxed);
+            gui::g_iTotalProgress.store(totalProgress, std::memory_order_relaxed);
         },
-        [&](double bytesPerSecond)
+        [](const std::string& fileName)
+        {
+            std::lock_guard<std::mutex> lock(gui::g_FileStringMutex);
+            gui::g_FileString = lang::GetString("launcher_worker_downloading") + ": " + fileName;
+        },
+        [](double bytesPerSecond)
         {
             double speed = bytesPerSecond;
             const char* units[] = { "B/s", "KB/s", "MB/s", "GB/s", "TB/s" };
@@ -215,10 +199,10 @@ bool Helper::DownloadFile(const std::string& remoteFile, const std::string& loca
                 ++unit;
             }
 
-            std::ostringstream oss;
-            oss << std::fixed << std::setprecision(2) << speed << " " << units[unit];
+            char buffer[64]{};
+            std::snprintf(buffer, sizeof(buffer), "%.2f %s", speed, units[unit]);
             std::lock_guard<std::mutex> lock(gui::g_SpeedStringMutex);
-            gui::g_SpeedString = oss.str();
+            gui::g_SpeedString = buffer;
         });
 
     {
@@ -226,44 +210,18 @@ bool Helper::DownloadFile(const std::string& remoteFile, const std::string& loca
         gui::g_SpeedString.clear();
     }
 
-    return result;
-}
-
-bool Helper::WorkerUpdating(int updateCount)
-{
-    int index = 1;
-    gui::g_iTotalProgress.store(0.0f, std::memory_order_relaxed);
-    if (updateCount > 0)
-    {
-        for (const auto& file : ListaArquivos)
-        {
-            if (!file.ToUpdate) continue;
-            gui::g_iFileProgress = 0.0f;
-            std::string fileName = file.FilePath.substr(file.FilePath.find_last_of("/\\") + 1);
-            std::string remotePath = file.FilePath;
-            std::replace(remotePath.begin(), remotePath.end(), '\\', '/');
-            std::string dirPath = GetDirectoryFromPath(file.FilePath);
-            if (!CreateDirectoryIfNotExists(dirPath))
-                return false;
-            {
-                std::lock_guard<std::mutex> lockFile(gui::g_FileStringMutex);
-                gui::g_FileString = lang::GetString("launcher_worker_downloading") + ": " + fileName;
-            }
-            if (!DownloadFile(remotePath, file.FilePath, index, updateCount))
-                return false;
-            index++;
-        }
-    }
+    if (!result)
+        return false;
 
     gui::g_iFileProgress.store(1.0f, std::memory_order_relaxed);
     gui::g_iTotalProgress.store(1.0f, std::memory_order_relaxed);
     {
-        std::lock_guard<std::mutex> lockFile(gui::g_FileStringMutex);
-        if (!isMaintenance)
-            gui::g_FileString = lang::GetString("launcher_worker_complete");
-        else
-            gui::g_FileString = lang::GetString("launcher_worker_maintenance");
+        std::lock_guard<std::mutex> lock(gui::g_FileStringMutex);
+        gui::g_FileString = isMaintenance
+            ? lang::GetString("launcher_worker_maintenance")
+            : lang::GetString("launcher_worker_complete");
     }
+
     return true;
 }
 
@@ -294,27 +252,35 @@ void Helper::ClickPlayButton()
 
 void Helper::UpdateLauncher()
 {
-    std::string launcherName = "Splash.exe";
-    std::transform(launcherName.begin(), launcherName.end(), launcherName.begin(), [](unsigned char c) { return std::tolower(c); });
+    const std::string launcherName = "Splash.exe";
 
-    std::string currentExe;
     char exePath[MAX_PATH]{};
     GetModuleFileNameA(nullptr, exePath, MAX_PATH);
-    currentExe = exePath;
-
+    const std::string currentExe = exePath;
     const std::filesystem::path launcherPath(currentExe);
+
     LauncherUpdater updater(GetEndpoints(), config::IsCDNUsingSSL);
     const std::string remoteLauncherHash = GetFileFromURL(1);
     if (remoteLauncherHash.empty())
     {
-        MessageBoxA(NULL, lang::GetString("launcher_update_check_fail").c_str(), "Error!", MB_OK);
+        MessageBoxA(nullptr,
+                    lang::GetString("launcher_update_check_fail").c_str(),
+                    "Error!",
+                    MB_OK);
         PostQuitMessage(0);
         return;
     }
 
-    if (!updater.Update(launcherPath, remoteLauncherHash, launcherName, currentExe))
+    if (!updater.Update(
+            launcherPath,
+            remoteLauncherHash,
+            launcherName,
+            currentExe))
     {
-        MessageBoxA(NULL, lang::GetString("launcher_update_download_fail").c_str(), "Error!", MB_OK);
+        MessageBoxA(nullptr,
+                    lang::GetString("launcher_update_download_fail").c_str(),
+                    "Error!",
+                    MB_OK);
         PostQuitMessage(0);
     }
 }
