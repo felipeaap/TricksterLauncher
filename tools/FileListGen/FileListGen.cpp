@@ -11,9 +11,10 @@
 #include <future>
 #include <semaphore>
 #include <cctype>
+#include <array>
 
 #include "json.hpp"
-#include "ManifestSecurity.h"
+#include "../../Source/NewLauncher/ManifestSecurity.h"
 #include "openssl/evp.h"
 
 using json = nlohmann::json;
@@ -363,7 +364,6 @@ int main(int argc, char* argv[])
         return 1;
 
     salvarLauncherHash("Update\\Splash.exe");
-
     std::cout << "Manifest written using SHA-256" << std::endl;
     return 0;
 }
