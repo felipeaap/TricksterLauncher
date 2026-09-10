@@ -6,6 +6,7 @@
 #include "ManifestManager.h"
 #include "FileVerifier.h"
 #include "DownloadManager.h"
+#include "EndpointManager.h"
 #include "UpdateCoordinator.h"
 #include "GameLauncher.h"
 #include "LauncherUpdater.h"
@@ -13,6 +14,24 @@
 #include <Shlwapi.h>
 #include <algorithm>
 #include <cctype>
+
+namespace
+{
+std::vector<std::string> GetEndpoints()
+{
+    std::vector<std::string> endpoints;
+    if (!config::LauncherCDN.empty())
+        endpoints.push_back(config::LauncherCDN);
+
+    for (const auto& backup : config::LauncherCDNBackups)
+    {
+        if (!backup.empty() && std::find(endpoints.begin(), endpoints.end(), backup) == endpoints.end())
+            endpoints.push_back(backup);
+    }
+
+    return endpoints;
+}
+}
 
 Helper::Helper()
 {
@@ -62,7 +81,8 @@ std::string Helper::GetFileFromURL(int iType)
 
 std::string Helper::GetFileFromURL(const std::string& customPath)
 {
-    return DownloadManager(config::LauncherCDN, config::IsCDNUsingSSL).Get(customPath);
+    EndpointManager endpoints(GetEndpoints(), config::IsCDNUsingSSL);
+    return endpoints.Get(customPath);
 }
 
 bool Helper::iequals(const std::string& a, const std::string& b)
@@ -161,8 +181,8 @@ bool Helper::CreateDirectoryIfNotExists(const std::string& dirPath)
 
 bool Helper::DownloadFile(const std::string& remoteFile, const std::string& localPath, int fileIndex, int totalFiles)
 {
-    DownloadManager manager(config::LauncherCDN, config::IsCDNUsingSSL);
-    const bool result = manager.Download(
+    EndpointManager endpoints(GetEndpoints(), config::IsCDNUsingSSL);
+    const bool result = endpoints.Download(
         remoteFile,
         localPath,
         [&](long long downloaded, long long contentLength)
@@ -173,7 +193,9 @@ bool Helper::DownloadFile(const std::string& remoteFile, const std::string& loca
                     std::memory_order_relaxed);
 
             gui::g_iTotalProgress.store(
-                (static_cast<float>(fileIndex - 1) + gui::g_iFileProgress.load()) / totalFiles,
+                totalFiles > 0
+                    ? (static_cast<float>(fileIndex - 1) + gui::g_iFileProgress.load()) / totalFiles
+                    : 1.0f,
                 std::memory_order_relaxed);
         },
         [&](double bytesPerSecond)
@@ -270,7 +292,7 @@ void Helper::UpdateLauncher()
     GetModuleFileNameA(nullptr, exePath, MAX_PATH);
     currentExe = exePath;
 
-    LauncherUpdater updater(config::LauncherCDN, config::IsCDNUsingSSL);
+    LauncherUpdater updater(GetEndpoints(), config::IsCDNUsingSSL);
     const std::string remoteLauncherHash = GetFileFromURL(1);
     if (remoteLauncherHash.empty())
     {
