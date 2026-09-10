@@ -29,7 +29,7 @@
     <ClCompile Include="LauncherApplication.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherUpdater.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Main.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
-    <ClCompile Include="ManifestManager.cpp"><Filter>Arquivos de Origem</Filter></ClInclude></ClCompile>
+    <ClCompile Include="ManifestManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="RendererD3D9.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="UpdateCoordinator.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="UpdateInstaller.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
