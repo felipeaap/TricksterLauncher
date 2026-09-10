@@ -28,6 +28,7 @@
     <ClCompile Include="Language.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherApplication.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherUpdater.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
+    <ClCompile Include="LauncherWindow.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Main.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="ManifestManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="RendererD3D9.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
@@ -58,6 +59,7 @@
     <ClInclude Include="Language.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="LauncherApplication.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="LauncherUpdater.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
+    <ClInclude Include="LauncherWindow.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="ManifestManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="RendererD3D9.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="resource.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
