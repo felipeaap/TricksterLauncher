@@ -1,25 +1,21 @@
 #pragma once
-#include <string>
-#include <unordered_map>
-#include <algorithm>
-#include <queue>
-#include "imgui.h"
-#include <fstream>
-#include <iostream>
-#include <thread>
+
+#include <atomic>
 #include <chrono>
-#include <future>
 #include <cstring>
 #include <cstdlib>
-#include "Crypt.h"
+#include <filesystem>
+#include <fstream>
+#include <future>
+#include <iostream>
+#include <queue>
+#include <string>
+#include <thread>
+#include <unordered_map>
+#include <vector>
 
-struct Arquivo
-{
-    int FileID;
-    std::string FileHash;
-    std::string FilePath;
-    bool ToUpdate = false;
-};
+#include "Crypt.h"
+#include "UpdateTypes.h"
 
 class Helper
 {
