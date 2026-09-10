@@ -9,6 +9,7 @@
 
 #include "Config.h"
 #include "Gui.h"
+#include "LauncherWindow.h"
 
 bool LauncherApplication::RequiresAdmin(const wchar_t* folderPath)
 {
@@ -70,10 +71,16 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     if (FAILED(hr))
         return EXIT_FAILURE;
 
-    gui::CreateHWindow(config::WindowTitle.c_str());
+    LauncherWindow launcherWindow;
+    if (!launcherWindow.Create(config::WindowTitle.c_str()))
+    {
+        CoUninitialize();
+        return EXIT_FAILURE;
+    }
+
     if (!gui::CreateDevice())
     {
-        gui::DestroyHWindow();
+        launcherWindow.Destroy();
         CoUninitialize();
         return EXIT_FAILURE;
     }
@@ -82,21 +89,8 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     gui::LoadResources();
     gui::InitWebView(gui::window);
 
-    MSG msg{};
-    while (gui::isRunning)
+    while (launcherWindow.PumpMessages())
     {
-        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
-        {
-            if (msg.message == WM_QUIT)
-            {
-                gui::isRunning = false;
-                break;
-            }
-
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-
         gui::BeginRender();
         gui::Render();
         gui::EndRender();
@@ -105,7 +99,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
 
     gui::DestroyImGui();
     gui::DestroyDevice();
-    gui::DestroyHWindow();
+    launcherWindow.Destroy();
     CoUninitialize();
     return EXIT_SUCCESS;
 }
