@@ -214,7 +214,6 @@ void Helper::WorkerUpdating(int updateCount)
             std::replace(remotePath.begin(), remotePath.end(), '\\', '/');
             std::string dirPath = GetDirectoryFromPath(file.FilePath);
             CreateDirectoryIfNotExists(dirPath);
-            std::remove(file.FilePath.c_str());
             {
                 std::lock_guard<std::mutex> lockFile(gui::g_FileStringMutex);
                 gui::g_FileString = lang::GetString("launcher_worker_downloading") + ": " + fileName;
