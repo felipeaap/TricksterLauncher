@@ -63,13 +63,103 @@ void LauncherView::Initialize() noexcept
     io.IniFilename = nullptr;
 }
 
+static inline ImU32 BlendCol(ImU32 c1, ImU32 c2, float t) noexcept
+{
+    t = (std::clamp)(t, 0.0f, 1.0f);
+    int r1 = (c1 >> IM_COL32_R_SHIFT) & 0xFF;
+    int g1 = (c1 >> IM_COL32_G_SHIFT) & 0xFF;
+    int b1 = (c1 >> IM_COL32_B_SHIFT) & 0xFF;
+    int a1 = (c1 >> IM_COL32_A_SHIFT) & 0xFF;
+
+    int r2 = (c2 >> IM_COL32_R_SHIFT) & 0xFF;
+    int g2 = (c2 >> IM_COL32_G_SHIFT) & 0xFF;
+    int b2 = (c2 >> IM_COL32_B_SHIFT) & 0xFF;
+    int a2 = (c2 >> IM_COL32_A_SHIFT) & 0xFF;
+
+    int r = static_cast<int>(r1 + (r2 - r1) * t);
+    int g = static_cast<int>(g1 + (g2 - g1) * t);
+    int b = static_cast<int>(b1 + (b2 - b1) * t);
+    int a = static_cast<int>(a1 + (a2 - a1) * t);
+
+    return IM_COL32(r, g, b, a);
+}
+
+void LauncherView::RenderButtonIcon(
+    ButtonIcon icon,
+    const ImVec2& center,
+    float size,
+    ImU32 color,
+    ImDrawList* dl) noexcept
+{
+    if (icon == ButtonIcon::None || !dl)
+        return;
+
+    const float r = size * 0.5f;
+
+    switch (icon)
+    {
+    case ButtonIcon::Play:
+    {
+        // Stylized crisp play triangle pointing right
+        ImVec2 p0(center.x - r * 0.45f, center.y - r * 0.70f);
+        ImVec2 p1(center.x + r * 0.85f, center.y);
+        ImVec2 p2(center.x - r * 0.45f, center.y + r * 0.70f);
+        dl->AddTriangleFilled(p0, p1, p2, color);
+        break;
+    }
+    case ButtonIcon::Check:
+    {
+        // Stylized checkmark with crisp lines
+        ImVec2 p0(center.x - r * 0.65f, center.y);
+        ImVec2 p1(center.x - r * 0.15f, center.y + r * 0.55f);
+        ImVec2 p2(center.x + r * 0.75f, center.y - r * 0.55f);
+        dl->AddLine(p0, p1, color, 1.8f);
+        dl->AddLine(p1, p2, color, 1.8f);
+        break;
+    }
+    case ButtonIcon::Settings:
+    {
+        // Minimalist modern gear: outer ring + core + 4 tick rays
+        dl->AddCircle(center, r * 0.70f, color, 12, 1.5f);
+        dl->AddCircleFilled(center, r * 0.20f, color);
+        for (int i = 0; i < 4; ++i)
+        {
+            const float ang = static_cast<float>(i) * (3.14159265f / 2.0f);
+            const float cosA = cosf(ang);
+            const float sinA = sinf(ang);
+            dl->AddLine(
+                ImVec2(center.x + cosA * (r * 0.55f), center.y + sinA * (r * 0.55f)),
+                ImVec2(center.x + cosA * (r * 0.95f), center.y + sinA * (r * 0.95f)),
+                color,
+                1.5f);
+        }
+        break;
+    }
+    case ButtonIcon::Exit:
+    {
+        // Minimalist power icon: circle arc + vertical line
+        dl->AddCircle(center, r * 0.70f, color, 12, 1.5f);
+        dl->AddLine(
+            ImVec2(center.x, center.y - r * 0.90f),
+            ImVec2(center.x, center.y - r * 0.15f),
+            color,
+            1.8f);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
 bool LauncherView::ModernButton(
     const char* id,
     const char* label,
     const ImVec2& size,
     bool isLocked,
+    ButtonIcon icon,
     ImU32 accentColor,
-    bool pulseGlow) noexcept
+    bool pulseGlow,
+    const char* tooltip) noexcept
 {
     ImGui::PushID(id);
     bool pressedResult = ImGui::InvisibleButton("##mbtn", size);
@@ -79,9 +169,28 @@ bool LauncherView::ModernButton(
     ImVec2 p1 = ImGui::GetItemRectMax();
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
+    ImGuiIO& io = ImGui::GetIO();
+    float dt = io.DeltaTime;
+    if (dt <= 0.0f) dt = 1.0f / 60.0f;
+    if (dt > 0.1f) dt = 0.1f;
+
+    // Smooth hover lerp animation
+    float& hoverVal = buttonHover_[id];
+    const float targetHover = (hovered && !isLocked) ? 1.0f : 0.0f;
+    hoverVal += (targetHover - hoverVal) * (1.0f - expf(-18.0f * dt));
+
     const float rounding = (std::min)(size.y * 0.5f, 18.0f); // Full smooth pill shape
     const float t = static_cast<float>(ImGui::GetTime());
     const bool isPrimaryCTA = (accentColor == IM_COL32(37, 99, 235, 255)) || pulseGlow;
+    const float yOffset = (held && !isLocked) ? 1.2f : 0.0f;
+
+    // Icon & Label geometry
+    const float iconSize = (icon != ButtonIcon::None) ? ((icon == ButtonIcon::Play) ? 14.0f : 12.0f) : 0.0f;
+    const float iconSpacing = (icon != ButtonIcon::None && label && *label) ? 6.0f : 0.0f;
+    ImVec2 textSize = (label && *label) ? ImGui::CalcTextSize(label) : ImVec2(0, 0);
+    const float totalContentW = iconSize + iconSpacing + textSize.x;
+    const float startX = p0.x + (size.x - totalContentW) * 0.5f;
+    const float centerY = p0.y + size.y * 0.5f + yOffset;
 
     if (isLocked)
     {
@@ -89,13 +198,19 @@ bool LauncherView::ModernButton(
         dl->AddRectFilled(p0, p1, IM_COL32(241, 245, 249, 255), rounding);
         dl->AddRect(p0, p1, IM_COL32(203, 213, 225, 255), rounding, 0, 1.0f);
 
+        const ImU32 lockedCol = IM_COL32(100, 116, 139, 255); // #64748b - Slate-500 neutral gray
+
+        if (icon != ButtonIcon::None)
+        {
+            RenderButtonIcon(icon, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, lockedCol, dl);
+        }
+
         if (label && *label)
         {
-            ImVec2 textSize = ImGui::CalcTextSize(label);
-            ImVec2 textPos = ImVec2(
-                p0.x + (size.x - textSize.x) * 0.5f,
+            ImVec2 textPos(
+                (icon != ButtonIcon::None) ? (startX + iconSize + iconSpacing) : (p0.x + (size.x - textSize.x) * 0.5f),
                 p0.y + (size.y - textSize.y) * 0.5f);
-            dl->AddText(textPos, IM_COL32(100, 116, 139, 255), label); // #64748b - Slate-500 neutral gray
+            dl->AddText(textPos, lockedCol, label);
         }
     }
     else if (isPrimaryCTA)
@@ -113,51 +228,73 @@ bool LauncherView::ModernButton(
                 2.0f);
         }
 
-        // Soft outer blue drop-shadow
+        // Tactile depth shadow
+        const float shadowH = (held) ? 1.5f : 4.5f;
         dl->AddRectFilled(
             ImVec2(p0.x + 1.0f, p0.y + 2.0f),
-            ImVec2(p1.x - 1.0f, p1.y + 4.5f),
+            ImVec2(p1.x - 1.0f, p1.y + shadowH),
             IM_COL32(30, 64, 175, 60),
             rounding);
 
-        // Gradient Fill
-        ImU32 colTop, colBottom;
+        // Gradient Fill (smoothly blended on hover)
+        const ImU32 baseTop = IM_COL32(37, 99, 235, 255);   // #2563eb
+        const ImU32 baseBottom = IM_COL32(29, 78, 216, 255); // #1d4ed8
+        const ImU32 hoverTop = IM_COL32(59, 130, 246, 255);  // #3b82f6
+        const ImU32 hoverBottom = IM_COL32(37, 99, 235, 255);
+
+        ImU32 colTop = BlendCol(baseTop, hoverTop, hoverVal);
+        ImU32 colBottom = BlendCol(baseBottom, hoverBottom, hoverVal);
+
         if (held)
         {
-            colTop = IM_COL32(30, 64, 175, 255);    // #1e40af
-            colBottom = IM_COL32(29, 78, 216, 255); // #1d4ed8
-        }
-        else if (hovered)
-        {
-            colTop = IM_COL32(59, 130, 246, 255);   // #3b82f6
-            colBottom = IM_COL32(37, 99, 235, 255); // #2563eb
-        }
-        else
-        {
-            colTop = IM_COL32(37, 99, 235, 255);    // #2563eb
-            colBottom = IM_COL32(29, 78, 216, 255); // #1d4ed8
+            colTop = IM_COL32(30, 64, 175, 255);
+            colBottom = IM_COL32(29, 78, 216, 255);
         }
 
-        dl->AddRectFilledMultiColor(p0, p1, colTop, colTop, colBottom, colBottom);
+        ImVec2 drawP0 = ImVec2(p0.x, p0.y + yOffset);
+        ImVec2 drawP1 = ImVec2(p1.x, p1.y + yOffset);
+
+        dl->AddRectFilledMultiColor(drawP0, drawP1, colTop, colTop, colBottom, colBottom);
 
         // Soft top-half specular sheen
+        const int sheenAlpha = static_cast<int>(45.0f + 25.0f * hoverVal);
         dl->AddRectFilled(
-            p0,
-            ImVec2(p1.x, p0.y + size.y * 0.45f),
-            IM_COL32(255, 255, 255, hovered ? 70 : 45),
+            drawP0,
+            ImVec2(drawP1.x, drawP0.y + size.y * 0.45f),
+            IM_COL32(255, 255, 255, sheenAlpha),
             rounding,
             ImDrawFlags_RoundCornersTop);
 
         // Luminous border
-        dl->AddRect(p0, p1, IM_COL32(191, 219, 254, 240), rounding, 0, 1.2f);
+        dl->AddRect(drawP0, drawP1, IM_COL32(191, 219, 254, 240), rounding, 0, 1.2f);
 
-        // Crisp White Typography with soft depth
+        // Diagonal shimmer sweep glide
+        if (!held)
+        {
+            dl->PushClipRect(drawP0, drawP1, true);
+            const float skewX = size.y * 0.6f;
+            const float sweepPhase = fmodf(t * 0.9f, 2.2f) - 0.5f;
+            const float sweepCenter = drawP0.x + (size.x + skewX * 2.0f) * sweepPhase - skewX;
+            dl->AddQuadFilled(
+                ImVec2(sweepCenter + skewX - 16.0f, drawP0.y),
+                ImVec2(sweepCenter + skewX + 16.0f, drawP0.y),
+                ImVec2(sweepCenter - skewX + 16.0f, drawP1.y),
+                ImVec2(sweepCenter - skewX - 16.0f, drawP1.y),
+                IM_COL32(255, 255, 255, 45));
+            dl->PopClipRect();
+        }
+
+        // Crisp White Typography & Play Icon with soft depth
+        if (icon != ButtonIcon::None)
+        {
+            RenderButtonIcon(icon, ImVec2(startX + iconSize * 0.5f, centerY + 1.0f), iconSize, IM_COL32(15, 23, 42, 160), dl);
+            RenderButtonIcon(icon, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, IM_COL32(255, 255, 255, 255), dl);
+        }
+
         if (label && *label)
         {
-            ImVec2 textSize = ImGui::CalcTextSize(label);
-            const float yOffset = held ? 1.0f : 0.0f;
-            ImVec2 textPos = ImVec2(
-                p0.x + (size.x - textSize.x) * 0.5f,
+            ImVec2 textPos(
+                (icon != ButtonIcon::None) ? (startX + iconSize + iconSpacing) : (p0.x + (size.x - textSize.x) * 0.5f),
                 p0.y + (size.y - textSize.y) * 0.5f + yOffset);
 
             dl->AddText(ImVec2(textPos.x + 0.5f, textPos.y + 1.0f), IM_COL32(15, 23, 42, 180), label);
@@ -167,46 +304,60 @@ bool LauncherView::ModernButton(
     else
     {
         // ── Secondary Floating White Pill Buttons (Check, Options, Exit) ──
-        // Soft ambient card shadow
+        // Tactile ambient shadow
+        const float shadowH = (held) ? 1.0f : 3.0f;
         dl->AddRectFilled(
             ImVec2(p0.x, p0.y + 1.0f),
-            ImVec2(p1.x, p1.y + 3.0f),
+            ImVec2(p1.x, p1.y + shadowH),
             IM_COL32(50, 80, 120, 35),
             rounding);
 
-        // Base fill & Border with Trickster Orange Palette on hover
-        ImU32 baseFill = IM_COL32(255, 255, 255, 255);
-        ImU32 borderCol = IM_COL32(148, 163, 184, 255); // #94a3b8 - Crisp clear border
+        // Smoothly animated Base fill & Border with Trickster Orange Palette
+        const ImU32 normFill = IM_COL32(255, 255, 255, 255);
+        const ImU32 hovFill = IM_COL32(255, 247, 237, 255); // #fff7ed
+        const ImU32 normBorder = IM_COL32(148, 163, 184, 255); // #94a3b8
+        const ImU32 hovBorder = IM_COL32(249, 115, 22, 255);  // #f97316
+
+        ImU32 baseFill = BlendCol(normFill, hovFill, hoverVal);
+        ImU32 borderCol = BlendCol(normBorder, hovBorder, hoverVal);
 
         if (held)
         {
-            baseFill = IM_COL32(255, 237, 213, 255);  // #ffedd5 - Warm orange
-            borderCol = IM_COL32(234, 88, 12, 255);   // #ea580c - Deep Trickster Orange
+            baseFill = IM_COL32(255, 237, 213, 255);  // #ffedd5
+            borderCol = IM_COL32(234, 88, 12, 255);   // #ea580c
         }
-        else if (hovered)
+
+        ImVec2 drawP0 = ImVec2(p0.x, p0.y + yOffset);
+        ImVec2 drawP1 = ImVec2(p1.x, p1.y + yOffset);
+
+        dl->AddRectFilled(drawP0, drawP1, baseFill, rounding);
+        dl->AddRect(drawP0, drawP1, borderCol, rounding, 0, 1.3f + 0.2f * hoverVal);
+
+        // Smoothly animated Typography and Icon (Deep Navy normal ➔ Trickster Orange on hover)
+        const ImU32 normText = IM_COL32(15, 23, 42, 255);
+        const ImU32 hovText = IM_COL32(234, 88, 12, 255); // #ea580c
+        ImU32 textCol = BlendCol(normText, hovText, hoverVal);
+
+        if (icon != ButtonIcon::None)
         {
-            baseFill = IM_COL32(255, 247, 237, 255);  // #fff7ed - Soft warm orange tint
-            borderCol = IM_COL32(249, 115, 22, 255);  // #f97316 - Iconic Trickster Orange
+            RenderButtonIcon(icon, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, textCol, dl);
         }
 
-        dl->AddRectFilled(p0, p1, baseFill, rounding);
-        dl->AddRect(p0, p1, borderCol, rounding, 0, hovered ? 1.5f : 1.3f);
-
-        // Typography (Deep Navy normal, Vibrant Trickster Orange on hover)
         if (label && *label)
         {
-            ImVec2 textSize = ImGui::CalcTextSize(label);
-            const float yOffset = held ? 1.0f : 0.0f;
-            ImVec2 textPos = ImVec2(
-                p0.x + (size.x - textSize.x) * 0.5f,
+            ImVec2 textPos(
+                (icon != ButtonIcon::None) ? (startX + iconSize + iconSpacing) : (p0.x + (size.x - textSize.x) * 0.5f),
                 p0.y + (size.y - textSize.y) * 0.5f + yOffset);
-
-            ImU32 textCol = hovered
-                ? IM_COL32(234, 88, 12, 255)          // #ea580c - Vibrant Trickster Orange!
-                : IM_COL32(15, 23, 42, 255);          // #0f172a - High contrast dark navy!
 
             dl->AddText(textPos, textCol, label);
         }
+    }
+
+    if (hovered && tooltip && *tooltip)
+    {
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(tooltip);
+        ImGui::EndTooltip();
     }
 
     ImGui::PopID();
@@ -224,7 +375,11 @@ bool LauncherView::ImageButton(
     const char* fallbackLabel,
     ImU32 fallbackAccent) noexcept
 {
-    return ModernButton(id, fallbackLabel ? fallbackLabel : id, size, isLocked, fallbackAccent);
+    (void)normal;
+    (void)hover;
+    (void)pressed;
+    (void)locked;
+    return ModernButton(id, fallbackLabel ? fallbackLabel : id, size, isLocked, ButtonIcon::None, fallbackAccent);
 }
 
 void LauncherView::RenderLink(
@@ -620,8 +775,10 @@ void LauncherView::Render(
                 lang::GetString("launcher_game_start").c_str(),
                 ImVec2(118, 58),
                 gameLocked,
+                ButtonIcon::Play,
                 IM_COL32(37, 99, 235, 255),
-                !gameLocked))
+                !gameLocked,
+                gameLocked ? "Aguardando download dos arquivos..." : "Iniciar o Trickster Online!"))
         {
             if (!gameLocked && events.onPlayClicked)
                 events.onPlayClicked();
@@ -642,7 +799,11 @@ void LauncherView::Render(
                 "##btn_check",
                 lang::GetString("launcher_check").c_str(),
                 ImVec2(btnW, btnH),
-                checkLocked))
+                checkLocked,
+                ButtonIcon::Check,
+                IM_COL32(0, 162, 237, 255),
+                false,
+                "Verificar e validar integridade dos arquivos"))
         {
             if (!checkLocked && events.onCheckClicked)
                 events.onCheckClicked();
@@ -655,7 +816,11 @@ void LauncherView::Render(
                 "##btn_options",
                 lang::GetString("launcher_options").c_str(),
                 ImVec2(btnW, btnH),
-                optionLocked))
+                optionLocked,
+                ButtonIcon::Settings,
+                IM_COL32(0, 162, 237, 255),
+                false,
+                "Configurar resolucao, video e audio"))
         {
             if (!optionLocked && events.onOptionClicked)
                 events.onOptionClicked();
@@ -667,7 +832,11 @@ void LauncherView::Render(
                 "##btn_exit",
                 lang::GetString("launcher_exit").c_str(),
                 ImVec2(btnW, btnH),
-                false))
+                false,
+                ButtonIcon::Exit,
+                IM_COL32(0, 162, 237, 255),
+                false,
+                "Fechar o Trickster Launcher"))
         {
             if (events.onExitClicked)
                 events.onExitClicked();

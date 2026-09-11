@@ -6,6 +6,17 @@
 #include "TextureManager.h"
 #include "imgui.h"
 
+#include <unordered_map>
+
+enum class ButtonIcon
+{
+    None,
+    Play,
+    Check,
+    Settings,
+    Exit
+};
+
 struct LauncherViewEvents
 {
     std::function<void()> onPlayClicked;
@@ -35,7 +46,7 @@ public:
     void RequestClose() noexcept { shouldClose_ = true; }
 
 private:
-    static bool ImageButton(
+    bool ImageButton(
         const char* id,
         IDirect3DTexture9* normal,
         IDirect3DTexture9* hover,
@@ -46,13 +57,22 @@ private:
         const char* fallbackLabel = nullptr,
         ImU32 fallbackAccent = IM_COL32(0, 162, 237, 255)) noexcept;
 
-    static bool ModernButton(
+    bool ModernButton(
         const char* id,
         const char* label,
         const ImVec2& size,
         bool isLocked,
+        ButtonIcon icon = ButtonIcon::None,
         ImU32 accentColor = IM_COL32(0, 162, 237, 255),
-        bool pulseGlow = false) noexcept;
+        bool pulseGlow = false,
+        const char* tooltip = nullptr) noexcept;
+
+    static void RenderButtonIcon(
+        ButtonIcon icon,
+        const ImVec2& center,
+        float size,
+        ImU32 color,
+        ImDrawList* dl) noexcept;
 
     static void RenderLink(
         const char* label,
@@ -77,4 +97,7 @@ private:
     ImFont* fontLarge_ = nullptr;
     float animFileProgress_ = 0.0f;
     float animTotalProgress_ = 0.0f;
+    float gameStartUnlockSweep_ = 0.0f;
+    bool wasGameEnabled_ = false;
+    std::unordered_map<std::string, float> buttonHover_;
 };
