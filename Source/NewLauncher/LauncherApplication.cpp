@@ -174,6 +174,10 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     Logger::Log("Presenter initialised");
 
     LauncherViewEvents viewEvents = presenter.CreateViewEvents();
+    viewEvents.onMinimizeClicked = [&launcherWindow]()
+    {
+        launcherWindow.Minimize();
+    };
 
     // ── WebView2 ─────────────────────────────────────────────────────────────
     webView.Initialize(launcherWindow.Handle(), config::BaseNewsURL);

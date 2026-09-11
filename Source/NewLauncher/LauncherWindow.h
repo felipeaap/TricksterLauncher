@@ -18,6 +18,7 @@ public:
 
     bool Create(const wchar_t* title) noexcept;
     void Destroy() noexcept;
+    void Minimize() noexcept;
     bool PumpMessages() noexcept;
 
     static constexpr int kDefaultWidth = 538;

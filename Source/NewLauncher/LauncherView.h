@@ -12,6 +12,7 @@ struct LauncherViewEvents
     std::function<void()> onCheckClicked;
     std::function<void()> onOptionClicked;
     std::function<void()> onExitClicked;
+    std::function<void()> onMinimizeClicked;
     std::function<void(const std::string& url)> onLinkClicked;
 };
 
@@ -41,7 +42,17 @@ private:
         IDirect3DTexture9* pressed,
         IDirect3DTexture9* locked,
         const ImVec2& size,
-        bool isLocked) noexcept;
+        bool isLocked,
+        const char* fallbackLabel = nullptr,
+        ImU32 fallbackAccent = IM_COL32(0, 162, 237, 255)) noexcept;
+
+    static bool ModernButton(
+        const char* id,
+        const char* label,
+        const ImVec2& size,
+        bool isLocked,
+        ImU32 accentColor = IM_COL32(0, 162, 237, 255),
+        bool pulseGlow = false) noexcept;
 
     static void RenderLink(
         const char* label,
@@ -56,11 +67,13 @@ private:
         ImU32 colHighlight,
         ImU32 colShadow,
         ImU32 colBorder,
-        float rounding = 4.0f) noexcept;
+        float rounding = 4.0f,
+        bool showPercentage = false) noexcept;
 
     bool shouldClose_ = false;
     ImFont* fontSmall_ = nullptr;
     ImFont* fontRegular_ = nullptr;
+    ImFont* fontBold_ = nullptr;
     float animFileProgress_ = 0.0f;
     float animTotalProgress_ = 0.0f;
 };

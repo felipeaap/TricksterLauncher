@@ -82,6 +82,12 @@ void LauncherWindow::Destroy() noexcept
     running_ = false;
 }
 
+void LauncherWindow::Minimize() noexcept
+{
+    if (window_)
+        ShowWindow(window_, SW_MINIMIZE);
+}
+
 bool LauncherWindow::PumpMessages() noexcept
 {
     MSG message{};
