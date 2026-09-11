@@ -116,6 +116,20 @@ void RunDownloadManagerTests()
                                       std::istreambuf_iterator<char>());
         assert(downloadedContent == testData);
 
+        // 3. Test Download() with hash matching
+        const std::string testHash = "dummy_hash_12345";
+        bool okWithHash = dm.Download(
+            "testfile.bin",
+            localOut.string(),
+            [](long long, long long) {},
+            [](double) {},
+            [](const std::string&) {},
+            testHash
+        );
+        assert(okWithHash);
+        assert(std::filesystem::exists(localOut));
+        assert(std::filesystem::file_size(localOut) == testData.size());
+
         // Cleanup
         inFile.close();
         std::filesystem::remove(localOut, ec);

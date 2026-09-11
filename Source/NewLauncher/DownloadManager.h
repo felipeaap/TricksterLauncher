@@ -28,7 +28,8 @@ public:
                   const std::string& localPath,
                   ProgressCallback progress = {},
                   SpeedCallback speed = {},
-                  ErrorCallback errorCallback = {}) const;
+                  ErrorCallback errorCallback = {},
+                  const std::string& expectedHash = {}) const;
 
 private:
     std::string host_;

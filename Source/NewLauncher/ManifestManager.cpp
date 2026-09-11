@@ -95,11 +95,34 @@ int ManifestManager::Load(FileList& files, bool isFullCheck, int& localVersion)
                 LoadFilesFromArray(document.value("files", nlohmann::json::array()), files);
                 return manifestVersion;
             }
+            else if (config::ManifestRequireSignature)
+            {
+                // Strict mode: signature validation failed on consolidated manifest.
+                // Fail-closed immediately.
+                files.clear();
+                return localVersion;
+            }
+        }
+        else if (config::ManifestRequireSignature)
+        {
+            // Strict mode: manifest.json is missing or inaccessible.
+            // Fail-closed immediately.
+            files.clear();
+            return localVersion;
         }
     }
     catch (const nlohmann::json::exception&)
     {
         files.clear();
+        if (config::ManifestRequireSignature)
+            return localVersion;
+    }
+
+    // Fallback: legacy versioned manifests (only allowed when signature is not strictly required)
+    if (config::ManifestRequireSignature)
+    {
+        files.clear();
+        return localVersion;
     }
 
     files.clear();

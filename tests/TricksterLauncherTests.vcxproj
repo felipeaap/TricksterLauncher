@@ -122,6 +122,7 @@
     <ClCompile Include="DownloadManagerTests.cpp" />
     <ClCompile Include="LauncherStateTests.cpp" />
     <ClCompile Include="ConfigTests.cpp" />
+    <ClCompile Include="..\Source\NewLauncher\ManifestManager.cpp" />
     <ClCompile Include="..\Source\NewLauncher\DownloadPolicy.cpp" />
     <ClCompile Include="..\Source\NewLauncher\ManifestSecurity.cpp" />
     <ClCompile Include="..\Source\NewLauncher\DownloadManager.cpp" />

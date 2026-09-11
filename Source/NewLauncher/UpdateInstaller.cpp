@@ -49,7 +49,7 @@ bool UpdateInstaller::Install(const std::vector<Arquivo>& files,
                 : file.FilePath.substr(separator + 1));
         }
 
-        if (!DownloadOne(remotePath, file.FilePath, file.FileSize,
+        if (!DownloadOne(remotePath, file.FilePath, file.FileSize, file.FileHash,
                          index, updateCount, progress, speed))
             return false;
 
@@ -64,6 +64,7 @@ bool UpdateInstaller::Install(const std::vector<Arquivo>& files,
 bool UpdateInstaller::DownloadOne(const std::string& remotePath,
                                   const std::string& localPath,
                                   long long fileSize,
+                                  const std::string& expectedHash,
                                   int fileIndex,
                                   int totalFiles,
                                   const ProgressCallback& progress,
@@ -101,7 +102,8 @@ bool UpdateInstaller::DownloadOne(const std::string& remotePath,
             if (progress)
                 progress(fileProgress, totalProgress);
         },
-        speed);
+        speed,
+        expectedHash);
 }
 
 bool UpdateInstaller::EnsureDirectory(const std::string& directory)

@@ -48,7 +48,8 @@ std::string EndpointManager::Get(const std::string& path) const
 bool EndpointManager::Download(const std::string& remotePath,
                                const std::string& localPath,
                                DownloadManager::ProgressCallback progress,
-                               DownloadManager::SpeedCallback speed) const
+                               DownloadManager::SpeedCallback speed,
+                               const std::string& expectedHash) const
 {
     bool attempted = false;
     for (const auto& host : hosts_)
@@ -62,7 +63,7 @@ bool EndpointManager::Download(const std::string& remotePath,
 
         const auto started = std::chrono::steady_clock::now();
         DownloadManager manager(host, useSsl_, options_);
-        const bool success = manager.Download(remotePath, localPath, progress, speed);
+        const bool success = manager.Download(remotePath, localPath, progress, speed, {}, expectedHash);
 
         long long bytes = 0;
         std::error_code error;

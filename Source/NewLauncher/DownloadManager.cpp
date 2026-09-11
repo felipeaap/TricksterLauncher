@@ -62,6 +62,36 @@ bool ParseContentRange(const std::string& value, long long& total)
     return total > 0;
 }
 
+bool ParseDetailedContentRange(const std::string& value, long long& rangeStart, long long& rangeEnd, long long& total)
+{
+    std::string s = value;
+    const std::string prefix = "bytes ";
+    if (s.rfind(prefix, 0) == 0)
+        s = s.substr(prefix.size());
+
+    const auto dash = s.find('-');
+    const auto slash = s.find('/');
+    if (dash == std::string::npos || slash == std::string::npos || dash >= slash)
+        return false;
+
+    try
+    {
+        rangeStart = std::stoll(s.substr(0, dash));
+        rangeEnd = std::stoll(s.substr(dash + 1, slash - (dash + 1)));
+        const std::string totalStr = s.substr(slash + 1);
+        if (totalStr == "*")
+            total = -1;
+        else
+            total = std::stoll(totalStr);
+    }
+    catch (...)
+    {
+        return false;
+    }
+
+    return rangeStart >= 0 && rangeEnd >= rangeStart;
+}
+
 template <typename Client>
 RemoteInfo ProbeRemote(Client& client,
                        const std::string& remotePath,
@@ -160,6 +190,7 @@ bool PreparePartFile(const std::filesystem::path& path, long long size)
 bool LoadMetadata(const std::filesystem::path& metadataPath,
                   long long remoteSize,
                   long long segmentSize,
+                  const std::string& expectedHash,
                   std::vector<SegmentState>& segments)
 {
     std::ifstream input(metadataPath);
@@ -168,11 +199,15 @@ bool LoadMetadata(const std::filesystem::path& metadataPath,
 
     long long storedSize = 0;
     long long storedSegmentSize = 0;
+    std::string storedHash;
     size_t count = 0;
-    if (!(input >> storedSize >> storedSegmentSize >> count))
+    if (!(input >> storedSize >> storedSegmentSize >> storedHash >> count))
         return false;
 
     if (storedSize != remoteSize || storedSegmentSize != segmentSize || count == 0)
+        return false;
+
+    if (!expectedHash.empty() && storedHash != expectedHash && storedHash != "*")
         return false;
 
     segments.clear();
@@ -185,7 +220,7 @@ bool LoadMetadata(const std::filesystem::path& metadataPath,
 
         SegmentState state;
         state.start = static_cast<long long>(i) * segmentSize;
-        state.end = std::min(remoteSize - 1, state.start + segmentSize - 1);
+        state.end = (std::min)(remoteSize - 1, state.start + segmentSize - 1);
         state.complete = complete != 0;
         segments.push_back(state);
     }
@@ -196,6 +231,7 @@ bool LoadMetadata(const std::filesystem::path& metadataPath,
 bool SaveMetadata(const std::filesystem::path& metadataPath,
                   long long remoteSize,
                   long long segmentSize,
+                  const std::string& expectedHash,
                   const std::vector<SegmentState>& segments)
 {
     const auto temporaryPath = metadataPath.string() + ".tmp";
@@ -203,7 +239,8 @@ bool SaveMetadata(const std::filesystem::path& metadataPath,
     if (!output)
         return false;
 
-    output << remoteSize << '\n' << segmentSize << '\n' << segments.size() << '\n';
+    const std::string hashToStore = expectedHash.empty() ? "*" : expectedHash;
+    output << remoteSize << ' ' << segmentSize << ' ' << hashToStore << ' ' << segments.size() << '\n';
     for (const auto& segment : segments)
         output << (segment.complete ? 1 : 0) << '\n';
 
@@ -279,7 +316,25 @@ bool DownloadRange(Client& client,
     const bool writeOk = output.good();
     output.close();
 
-    return writeOk && response && response->status == 206 && received == expected;
+    bool rangeHeaderValid = false;
+    if (response && response->status == 206)
+    {
+        const auto it = response->headers.find("Content-Range");
+        if (it != response->headers.end())
+        {
+            long long rStart = 0, rEnd = 0, rTotal = 0;
+            if (ParseDetailedContentRange(it->second, rStart, rEnd, rTotal))
+            {
+                rangeHeaderValid = (rStart == start);
+            }
+        }
+        else
+        {
+            rangeHeaderValid = (received == expected);
+        }
+    }
+
+    return writeOk && response && response->status == 206 && rangeHeaderValid && (received == expected);
 }
 
 template <typename Client>
@@ -347,14 +402,52 @@ bool DownloadSingleWithResume(Client& client,
         output.flush();
         output.close();
 
-        if (response && ((offset == 0 && response->status == 200) ||
-                         (offset > 0 && response->status == 206)))
+        if (response && response->status == 206 && offset > 0)
         {
-            offset += received;
-            if (offset == totalSize)
-                return true;
+            // Strict check of Content-Range
+            bool validRange = true;
+            const auto it = response->headers.find("Content-Range");
+            if (it != response->headers.end())
+            {
+                long long rStart = 0, rEnd = 0, rTotal = 0;
+                if (ParseDetailedContentRange(it->second, rStart, rEnd, rTotal))
+                {
+                    if (rStart != offset)
+                        validRange = false;
+                }
+            }
+
+            if (!validRange)
+            {
+                std::filesystem::remove(partPath, error);
+                offset = 0;
+                downloadedTotal.store(0, std::memory_order_relaxed);
+            }
+            else
+            {
+                offset += received;
+                if (offset == totalSize)
+                    return true;
+            }
         }
-        else if (offset > 0 && response && response->status == 200)
+        else if (response && response->status == 200)
+        {
+            if (offset > 0)
+            {
+                // Server sent entire file from 0 instead of partial range!
+                // Since output was in append mode, reset to 0 and restart cleanly.
+                std::filesystem::remove(partPath, error);
+                offset = 0;
+                downloadedTotal.store(0, std::memory_order_relaxed);
+            }
+            else
+            {
+                offset += received;
+                if (offset == totalSize)
+                    return true;
+            }
+        }
+        else if (response && response->status == 416)
         {
             std::filesystem::remove(partPath, error);
             offset = 0;
@@ -363,7 +456,7 @@ bool DownloadSingleWithResume(Client& client,
 
         if (attempt < options.maxRetries && options.retryDelayMilliseconds > 0)
         {
-            const long long backoffMs = static_cast<long long>(options.retryDelayMilliseconds) * (1LL << std::min(attempt, 4));
+            const long long backoffMs = static_cast<long long>(options.retryDelayMilliseconds) * (1LL << (std::min)(attempt, 4));
             std::this_thread::sleep_for(std::chrono::milliseconds(backoffMs));
         }
 
@@ -384,23 +477,24 @@ bool DownloadMulti(const std::string& host,
                    const DownloadManager::ProgressCallback& progress,
                    const DownloadManager::SpeedCallback& speedCallback,
                    const DownloadManager::ErrorCallback& errorCallback,
+                   const std::string& expectedHash,
                    const DownloadManager::Options& options)
 {
     if (totalSize <= 0 || options.maxConnections < 2)
         return false;
 
-    const long long segmentSize = std::max(1LL, options.segmentSizeBytes);
+    const long long segmentSize = (std::max)(1LL, options.segmentSizeBytes);
     const size_t segmentCount = static_cast<size_t>((totalSize + segmentSize - 1) / segmentSize);
 
     std::vector<SegmentState> segments;
-    if (!LoadMetadata(metadataPath, totalSize, segmentSize, segments))
+    if (!LoadMetadata(metadataPath, totalSize, segmentSize, expectedHash, segments))
     {
         segments.reserve(segmentCount);
         for (size_t i = 0; i < segmentCount; ++i)
         {
             SegmentState state;
             state.start = static_cast<long long>(i) * segmentSize;
-            state.end = std::min(totalSize - 1, state.start + segmentSize - 1);
+            state.end = (std::min)(totalSize - 1, state.start + segmentSize - 1);
             segments.push_back(state);
         }
 
@@ -408,7 +502,7 @@ bool DownloadMulti(const std::string& host,
         std::filesystem::remove(partPath, error);
         if (!PreparePartFile(partPath, totalSize))
             return false;
-        if (!SaveMetadata(metadataPath, totalSize, segmentSize, segments))
+        if (!SaveMetadata(metadataPath, totalSize, segmentSize, expectedHash, segments))
             return false;
     }
     else
@@ -422,7 +516,7 @@ bool DownloadMulti(const std::string& host,
                 return false;
             for (auto& segment : segments)
                 segment.complete = false;
-            if (!SaveMetadata(metadataPath, totalSize, segmentSize, segments))
+            if (!SaveMetadata(metadataPath, totalSize, segmentSize, expectedHash, segments))
                 return false;
         }
     }
@@ -445,11 +539,11 @@ bool DownloadMulti(const std::string& host,
         long long total = 0;
         for (auto& segmentProgress : segmentProgresses)
             total += segmentProgress.load(std::memory_order_relaxed);
-        return std::min(total, totalSize);
+        return (std::min)(total, totalSize);
     };
 
-    const int connectionCount = std::max(1, std::min(options.maxConnections,
-                                                     static_cast<int>(segments.size())));
+    const int connectionCount = (std::max)(1, (std::min)(options.maxConnections,
+                                                         static_cast<int>(segments.size())));
     std::vector<std::thread> workers;
     workers.reserve(connectionCount);
 
@@ -514,7 +608,7 @@ bool DownloadMulti(const std::string& host,
                 segmentProgresses[index].store(
                     segment.end - segment.start + 1, std::memory_order_relaxed);
 
-                if (!SaveMetadata(metadataPath, totalSize, segmentSize, segments))
+                if (!SaveMetadata(metadataPath, totalSize, segmentSize, expectedHash, segments))
                     return false;
                 return true;
             }
@@ -523,7 +617,7 @@ bool DownloadMulti(const std::string& host,
 
             if (attempt < options.maxRetries && options.retryDelayMilliseconds > 0)
             {
-                const long long backoffMs = static_cast<long long>(options.retryDelayMilliseconds) * (1LL << std::min(attempt, 4));
+                const long long backoffMs = static_cast<long long>(options.retryDelayMilliseconds) * (1LL << (std::min)(attempt, 4));
                 std::this_thread::sleep_for(std::chrono::milliseconds(backoffMs));
             }
         }
@@ -603,7 +697,8 @@ bool DownloadManager::Download(const std::string& remotePath,
                                const std::string& localPath,
                                ProgressCallback progress,
                                SpeedCallback speed,
-                               ErrorCallback errorCallback) const
+                               ErrorCallback errorCallback,
+                               const std::string& expectedHash) const
 {
     const std::filesystem::path destination(localPath);
     const auto partPath = MakePartPath(destination);
@@ -634,7 +729,7 @@ bool DownloadManager::Download(const std::string& remotePath,
         options_.maxConnections > 1)
     {
         success = DownloadMulti(host_, useSsl_, remotePath, partPath, metadataPath,
-                                info.size, progress, speed, errorCallback, options_);
+                                info.size, progress, speed, errorCallback, expectedHash, options_);
     }
     else if (info.rangeSupported)
     {

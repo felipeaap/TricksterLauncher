@@ -1,7 +1,10 @@
 #include <cassert>
 #include <iostream>
 #include <string>
+#include "../Source/NewLauncher/Config.h"
+#include "../Source/NewLauncher/ManifestManager.h"
 #include "../Source/NewLauncher/ManifestSecurity.h"
+#include "json.hpp"
 
 void RunManifestSecurityTests()
 {
@@ -47,6 +50,64 @@ void RunManifestSecurityTests()
     assert(!manifest_security::Verify("", signature, publicKeyPem));
     assert(!manifest_security::Verify(manifestJson, "", publicKeyPem));
     assert(!manifest_security::Verify(manifestJson, signature, ""));
+
+    // 6. Test ManifestManager strict fail-closed integration
+    config::ManifestPublicKeyPem = publicKeyPem;
+    config::ManifestRequireSignature = true;
+
+    // A: Signed manifest matches key -> should load successfully
+    nlohmann::json validDoc;
+    validDoc["version"] = 200;
+    validDoc["files"] = nlohmann::json::array({
+        { {"FileID", 1}, {"FilePath", "data.pak"}, {"FileHash", "abc"}, {"FileSize", 500LL}, {"ToUpdate", false} }
+    });
+    std::string validCanonical = validDoc.dump();
+    std::string validSig = manifest_security::Sign(validCanonical, privateKeyPem);
+    validDoc["signature"] = { {"value", validSig} };
+
+    ManifestManager mgrValid([&](const std::string& path) -> std::string {
+        if (path == "/manifest.json")
+            return validDoc.dump();
+        return {};
+    });
+
+    ManifestManager::FileList loadedFiles;
+    int localVer = 1;
+    int resVer = mgrValid.Load(loadedFiles, false, localVer);
+    assert(resVer == 200);
+    assert(loadedFiles.size() == 1);
+    assert(loadedFiles[0].FilePath == "data.pak");
+
+    // B: Forged/Tampered manifest -> MUST fail-closed when ManifestRequireSignature is true
+    nlohmann::json forgedDoc = validDoc;
+    forgedDoc["version"] = 999; // tampered version without resigning
+    ManifestManager mgrForged([&](const std::string& path) -> std::string {
+        if (path == "/manifest.json")
+            return forgedDoc.dump();
+        return {};
+    });
+
+    loadedFiles.clear();
+    localVer = 1;
+    resVer = mgrForged.Load(loadedFiles, false, localVer);
+    assert(loadedFiles.empty()); // failed-closed!
+
+    // C: Missing signature -> MUST fail-closed when ManifestRequireSignature is true
+    nlohmann::json unsignedDoc = validDoc;
+    unsignedDoc.erase("signature");
+    ManifestManager mgrUnsigned([&](const std::string& path) -> std::string {
+        if (path == "/manifest.json")
+            return unsignedDoc.dump();
+        return {};
+    });
+
+    loadedFiles.clear();
+    localVer = 1;
+    resVer = mgrUnsigned.Load(loadedFiles, false, localVer);
+    assert(loadedFiles.empty()); // failed-closed!
+
+    // Reset config
+    config::ManifestRequireSignature = false;
 
     std::cout << "[PASS] ManifestSecurity (RSA-PSS) tests passed!" << std::endl;
 }

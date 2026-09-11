@@ -16,7 +16,8 @@ public:
     bool Download(const std::string& remotePath,
                   const std::string& localPath,
                   DownloadManager::ProgressCallback progress = {},
-                  DownloadManager::SpeedCallback speed = {}) const;
+                  DownloadManager::SpeedCallback speed = {},
+                  const std::string& expectedHash = {}) const;
 
 private:
     std::vector<std::string> hosts_;
