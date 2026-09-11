@@ -395,6 +395,8 @@ bool LauncherView::ModernButton(
         }
     }
 
+    ImGui::PopID();
+    return pressedResult && !isLocked;
 }
 
 void LauncherView::RenderLink(
