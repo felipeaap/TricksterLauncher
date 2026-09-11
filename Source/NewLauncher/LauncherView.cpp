@@ -683,19 +683,16 @@ void LauncherView::Render(
     if (fabsf(animTotalProgress_ - state.totalProgress) < 0.0005f)
         animTotalProgress_ = state.totalProgress;
 
-    bool showWindow = true;
-    bool opened = ImGui::Begin(
+    ImGui::Begin(
         "##MainWindow",
-        &showWindow,
+        nullptr,
         nullptr,
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoTitleBar);
 
-    if (opened)
-    {
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        ImVec2 winSize = ImGui::GetWindowSize();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 winSize = ImGui::GetWindowSize();
 
         // 1. Soft Sky Blue & Cloud Pastel Backdrop (Matching Trickster Classic Website Atmosphere)
         dl->AddRectFilledMultiColor(
@@ -986,8 +983,4 @@ void LauncherView::Render(
         }
 
         ImGui::End();
-    }
-
-    if (!showWindow)
-        shouldClose_ = true;
 }
