@@ -48,6 +48,16 @@ private:
         const char* url,
         const std::function<void(const std::string&)>& onClick) noexcept;
 
+    static void RenderBeveledProgressBar(
+        float fraction,
+        const ImVec2& size,
+        ImU32 colTop,
+        ImU32 colBottom,
+        ImU32 colHighlight,
+        ImU32 colShadow,
+        ImU32 colBorder,
+        float rounding = 4.0f) noexcept;
+
     bool shouldClose_ = false;
     ImFont* fontSmall_ = nullptr;
     ImFont* fontRegular_ = nullptr;
