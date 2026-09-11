@@ -79,6 +79,10 @@ void LauncherPresenter::Update() noexcept
         const bool canPlay = !isMaintenance_;
         LauncherState::SetButtons(canPlay, true, true);
     }
+    else if (!isRunning_.load(std::memory_order_acquire))
+    {
+        LauncherState::SetButtons(false, true, true);
+    }
     else
     {
         LauncherState::SetButtons(false, false, false);
@@ -243,6 +247,15 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
         if (success)
         {
             VersionManager::Save(currentVersion_);
+        }
+        else
+        {
+            std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
+            if (LauncherState::fileString.find("complete") == std::string::npos &&
+                LauncherState::fileString.find("Complete") == std::string::npos)
+            {
+                LauncherState::fileString = lang::GetString("launcher_update_download_fail");
+            }
         }
     });
 }

@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "DownloadTelemetry.h"
+#include "Logger.h"
 
 namespace
 {
@@ -60,7 +61,16 @@ bool EndpointManager::Download(const std::string& remotePath,
 
         const auto started = std::chrono::steady_clock::now();
         DownloadManager manager(host, useSsl_, options_);
-        const bool success = manager.Download(remotePath, localPath, progress, speed, {}, expectedHash);
+        const bool success = manager.Download(
+            remotePath,
+            localPath,
+            progress,
+            speed,
+            [host](const std::string& err)
+            {
+                Logger::LogError("[" + host + "] " + err);
+            },
+            expectedHash);
 
         long long bytes = 0;
         std::error_code error;

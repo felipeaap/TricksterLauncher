@@ -20,8 +20,10 @@ namespace
 {
 struct RemoteInfo
 {
-    long long size = 0;
+    long long size = -1;
     bool rangeSupported = false;
+    bool exists = false;
+    int status = 0;
 };
 
 struct SegmentState
@@ -59,30 +61,27 @@ bool ParseContentRange(const std::string& value, long long& total)
         return false;
     }
 
-    return total > 0;
+    return total >= 0;
 }
 
-bool ParseDetailedContentRange(const std::string& value, long long& rangeStart, long long& rangeEnd, long long& total)
+bool ParseDetailedContentRange(const std::string& value,
+                               long long& rangeStart,
+                               long long& rangeEnd,
+                               long long& total)
 {
-    std::string s = value;
-    const std::string prefix = "bytes ";
-    if (s.rfind(prefix, 0) == 0)
-        s = s.substr(prefix.size());
+    const auto bytesPos = value.find("bytes ");
+    const auto hyphenPos = value.find('-');
+    const auto slashPos = value.find('/');
 
-    const auto dash = s.find('-');
-    const auto slash = s.find('/');
-    if (dash == std::string::npos || slash == std::string::npos || dash >= slash)
+    if (bytesPos == std::string::npos || hyphenPos == std::string::npos || slashPos == std::string::npos)
         return false;
 
     try
     {
-        rangeStart = std::stoll(s.substr(0, dash));
-        rangeEnd = std::stoll(s.substr(dash + 1, slash - (dash + 1)));
-        const std::string totalStr = s.substr(slash + 1);
-        if (totalStr == "*")
-            total = -1;
-        else
-            total = std::stoll(totalStr);
+        rangeStart = std::stoll(value.substr(bytesPos + 6, hyphenPos - (bytesPos + 6)));
+        rangeEnd = std::stoll(value.substr(hyphenPos + 1, slashPos - (hyphenPos + 1)));
+        const std::string totalStr = value.substr(slashPos + 1);
+        total = (totalStr == "*") ? -1 : std::stoll(totalStr);
     }
     catch (...)
     {
@@ -105,32 +104,37 @@ RemoteInfo ProbeRemote(Client& client,
     const auto head = client.Head(url.c_str());
     if (head)
     {
-        const auto length = head->headers.find("Content-Length");
-        if (length != head->headers.end())
+        info.status = head->status;
+        if (head->status == 200 || head->status == 206)
         {
-            try
+            info.exists = true;
+            const auto length = head->headers.find("Content-Length");
+            if (length != head->headers.end())
             {
-                info.size = std::stoll(length->second);
+                try
+                {
+                    info.size = std::stoll(length->second);
+                }
+                catch (...)
+                {
+                    info.size = -1;
+                }
             }
-            catch (...)
-            {
-                info.size = 0;
-            }
-        }
 
-        const auto acceptRanges = head->headers.find("Accept-Ranges");
-        if (acceptRanges != head->headers.end())
-        {
-            std::string value = acceptRanges->second;
-            std::transform(value.begin(), value.end(), value.begin(),
-                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            info.rangeSupported = value.find("bytes") != std::string::npos;
+            const auto acceptRanges = head->headers.find("Accept-Ranges");
+            if (acceptRanges != head->headers.end())
+            {
+                std::string value = acceptRanges->second;
+                std::transform(value.begin(), value.end(), value.begin(),
+                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                info.rangeSupported = value.find("bytes") != std::string::npos;
+            }
         }
     }
 
-    // A number of CDNs omit Accept-Ranges on HEAD. Probe one byte while
-    // discarding the body to avoid buffering a large file when Range is ignored.
-    if (!info.rangeSupported)
+    // A number of CDNs omit Accept-Ranges on HEAD or do not support HEAD.
+    // Probe one byte while discarding body to check Range and get content length.
+    if (!info.exists || !info.rangeSupported)
     {
         httplib::Headers headers;
         headers.emplace("Range", "bytes=0-0");
@@ -141,11 +145,25 @@ RemoteInfo ProbeRemote(Client& client,
                 return false;
             });
 
-        if (response && response->status == 206)
+        if (response)
         {
-            const auto range = response->headers.find("Content-Range");
-            if (range != response->headers.end())
-                info.rangeSupported = ParseContentRange(range->second, info.size);
+            info.status = response->status;
+            if (response->status == 206)
+            {
+                info.exists = true;
+                const auto range = response->headers.find("Content-Range");
+                if (range != response->headers.end())
+                    info.rangeSupported = ParseContentRange(range->second, info.size);
+            }
+            else if (response->status == 200)
+            {
+                info.exists = true;
+                const auto length = response->headers.find("Content-Length");
+                if (length != response->headers.end())
+                {
+                    try { info.size = std::stoll(length->second); } catch (...) { info.size = -1; }
+                }
+            }
         }
     }
 
@@ -716,55 +734,54 @@ bool DownloadManager::Download(const std::string& remotePath,
         info = ProbeRemote(client, remotePath, options_.connectionTimeoutSeconds);
     }
 
-    if (info.size <= 0)
+    // 1. Handle valid 0-byte (empty) files
+    if (info.exists && info.size == 0)
     {
-        if (errorCallback)
-            errorCallback("Remote file unavailable or empty: " + remotePath);
-        return false;
+        std::error_code error;
+        std::filesystem::remove(partPath, error);
+        std::filesystem::remove(metadataPath, error);
+        std::filesystem::remove(destination, error);
+
+        std::ofstream emptyFile(destination, std::ios::binary | std::ios::trunc);
+        emptyFile.close();
+
+        if (progress)
+            progress(0, 0);
+        if (speed)
+            speed(0.0);
+        return true;
     }
 
     bool success = false;
-    if (info.rangeSupported &&
+    if (info.exists && info.rangeSupported &&
         info.size >= options_.multiConnectionThresholdBytes &&
         options_.maxConnections > 1)
     {
         success = DownloadMulti(host_, useSsl_, remotePath, partPath, metadataPath,
                                 info.size, progress, speed, errorCallback, expectedHash, options_);
     }
-    else if (info.rangeSupported)
-    {
-        if (useSsl_)
-        {
-            httplib::SSLClient client(host_.c_str());
-            success = DownloadSingleWithResume(client, remotePath, partPath,
-                                               info.size, progress, speed, options_);
-        }
-        else
-        {
-            httplib::Client client(host_.c_str());
-            success = DownloadSingleWithResume(client, remotePath, partPath,
-                                               info.size, progress, speed, options_);
-        }
-    }
     else
     {
-        // Server does not support Range. Keep the staged download path, but
-        // do not claim resumability that the server cannot provide.
+        // Standard single download with resume / fallback
         std::error_code error;
-        std::filesystem::remove(partPath, error);
-        std::filesystem::remove(metadataPath, error);
+        if (!info.rangeSupported)
+        {
+            std::filesystem::remove(partPath, error);
+            std::filesystem::remove(metadataPath, error);
+        }
 
+        const long long targetSize = (info.size > 0) ? info.size : 0;
         if (useSsl_)
         {
             httplib::SSLClient client(host_.c_str());
             success = DownloadSingleWithResume(client, remotePath, partPath,
-                                               info.size, progress, speed, options_);
+                                               targetSize, progress, speed, options_);
         }
         else
         {
             httplib::Client client(host_.c_str());
             success = DownloadSingleWithResume(client, remotePath, partPath,
-                                               info.size, progress, speed, options_);
+                                               targetSize, progress, speed, options_);
         }
     }
 
@@ -776,11 +793,18 @@ bool DownloadManager::Download(const std::string& remotePath,
     }
 
     std::error_code error;
-    if (!std::filesystem::exists(partPath, error) ||
-        static_cast<long long>(std::filesystem::file_size(partPath, error)) != info.size || error)
+    if (!std::filesystem::exists(partPath, error))
     {
         if (errorCallback)
-            errorCallback("Downloaded file size mismatch or missing part file for: " + remotePath);
+            errorCallback("Downloaded file missing part file for: " + remotePath);
+        return false;
+    }
+
+    const auto downloadedBytes = static_cast<long long>(std::filesystem::file_size(partPath, error));
+    if (info.size > 0 && downloadedBytes != info.size)
+    {
+        if (errorCallback)
+            errorCallback("Downloaded file size mismatch for: " + remotePath);
         return false;
     }
 
@@ -796,7 +820,7 @@ bool DownloadManager::Download(const std::string& remotePath,
 
     std::filesystem::remove(metadataPath, error);
     if (progress)
-        progress(info.size, info.size);
+        progress(downloadedBytes, downloadedBytes);
     if (speed)
         speed(0.0);
 
