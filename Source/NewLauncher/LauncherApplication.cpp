@@ -15,7 +15,6 @@
 #include "LauncherWindow.h"
 #include "Logger.h"
 #include "RendererD3D9.h"
-#include "TextureManager.h"
 #include "imgui.h"
 #include "imgui_impl_dx9.h"
 #include "imgui_impl_win32.h"
@@ -102,7 +101,6 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     LauncherWindow   launcherWindow;
     RendererD3D9     renderer;
     LauncherWebView  webView;
-    TextureManager   textureManager;
     LauncherView     launcherView;
     LauncherPresenter presenter;
 
@@ -143,20 +141,6 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     }
     Logger::Log("D3D9 device created");
 
-    // ── Wire device-reset callbacks for TextureManager (P1 – Device Lost) ────
-    renderer.SetDeviceResetCallbacks(
-        [&textureManager]()
-        {
-            Logger::Log("Device lost — releasing textures");
-            textureManager.OnDeviceLost();
-        },
-        [&textureManager, &renderer, instance]()
-        {
-            Logger::Log("Device reset — reloading textures");
-            textureManager.OnDeviceReset(renderer.Device(), instance);
-        }
-    );
-
     // ── ImGui ────────────────────────────────────────────────────────────────
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -166,10 +150,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     ImGui_ImplDX9_Init(renderer.Device());
     Logger::Log("ImGui initialised");
 
-    // ── Resources & presenter ────────────────────────────────────────────────
-    textureManager.LoadAll(renderer.Device(), instance);
-    Logger::Log("Textures loaded");
-
+    // ── Presenter ────────────────────────────────────────────────────────────
     presenter.Initialize();
     Logger::Log("Presenter initialised");
 
@@ -196,7 +177,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
         ImGui::NewFrame();
 
         const LauncherViewState state = LauncherState::GetSnapshot();
-        launcherView.Render(state, textureManager, viewEvents);
+        launcherView.Render(state, viewEvents);
 
         ImGui::EndFrame();
         if (renderer.BeginFrame())
@@ -213,7 +194,6 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     // ── Teardown ─────────────────────────────────────────────────────────────
     webView.Shutdown();
     presenter.Shutdown();
-    textureManager.ReleaseAll();
 
     ImGui_ImplDX9_Shutdown();
     ImGui_ImplWin32_Shutdown();

@@ -395,26 +395,6 @@ bool LauncherView::ModernButton(
         }
     }
 
-    ImGui::PopID();
-    return pressedResult && !isLocked;
-}
-
-bool LauncherView::ImageButton(
-    const char* id,
-    IDirect3DTexture9* normal,
-    IDirect3DTexture9* hover,
-    IDirect3DTexture9* pressed,
-    IDirect3DTexture9* locked,
-    const ImVec2& size,
-    bool isLocked,
-    const char* fallbackLabel,
-    ImU32 fallbackAccent) noexcept
-{
-    (void)normal;
-    (void)hover;
-    (void)pressed;
-    (void)locked;
-    return ModernButton(id, fallbackLabel ? fallbackLabel : id, size, isLocked, ButtonIcon::None, fallbackAccent);
 }
 
 void LauncherView::RenderLink(
@@ -565,10 +545,8 @@ void LauncherView::RenderBeveledProgressBar(
 
 void LauncherView::Render(
     const LauncherViewState& state,
-    const TextureManager& textures,
     const LauncherViewEvents& events) noexcept
 {
-    (void)textures; // Modern theme bypasses legacy bitmaps
     ImGuiIO& io = ImGui::GetIO();
     ImGui::SetNextWindowPos({ 0, 0 });
     ImGui::SetNextWindowSize({ static_cast<float>(kWidth), static_cast<float>(kHeight) });

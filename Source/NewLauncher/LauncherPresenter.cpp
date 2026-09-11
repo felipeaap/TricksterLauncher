@@ -3,10 +3,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
-#include <filesystem>
-#include <shellapi.h>
 #define NOMINMAX
 #include <windows.h>
+#include <shellapi.h>
 
 #include "Config.h"
 #include "EndpointManager.h"

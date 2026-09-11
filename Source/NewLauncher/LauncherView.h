@@ -2,11 +2,9 @@
 
 #include <functional>
 #include <string>
-#include "LauncherState.h"
-#include "TextureManager.h"
-#include "imgui.h"
-
 #include <unordered_map>
+#include "LauncherState.h"
+#include "imgui.h"
 
 enum class ButtonIcon
 {
@@ -39,24 +37,12 @@ public:
     void Initialize() noexcept;
     void Render(
         const LauncherViewState& state,
-        const TextureManager& textures,
         const LauncherViewEvents& events) noexcept;
 
     bool ShouldClose() const noexcept { return shouldClose_; }
     void RequestClose() noexcept { shouldClose_ = true; }
 
 private:
-    bool ImageButton(
-        const char* id,
-        IDirect3DTexture9* normal,
-        IDirect3DTexture9* hover,
-        IDirect3DTexture9* pressed,
-        IDirect3DTexture9* locked,
-        const ImVec2& size,
-        bool isLocked,
-        const char* fallbackLabel = nullptr,
-        ImU32 fallbackAccent = IM_COL32(0, 162, 237, 255)) noexcept;
-
     bool ModernButton(
         const char* id,
         const char* label,
