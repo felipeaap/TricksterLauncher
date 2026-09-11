@@ -85,9 +85,9 @@ bool LauncherView::ModernButton(
 
     if (isLocked)
     {
-        // High-contrast muted slate pill (clear and easily readable disabled state)
-        dl->AddRectFilled(p0, p1, IM_COL32(230, 236, 243, 255), rounding);
-        dl->AddRect(p0, p1, IM_COL32(180, 196, 214, 255), rounding, 0, 1.2f);
+        // Neutral muted gray pill (distinctly disabled, easily readable without looking active)
+        dl->AddRectFilled(p0, p1, IM_COL32(241, 245, 249, 255), rounding);
+        dl->AddRect(p0, p1, IM_COL32(203, 213, 225, 255), rounding, 0, 1.0f);
 
         if (label && *label)
         {
@@ -95,7 +95,7 @@ bool LauncherView::ModernButton(
             ImVec2 textPos = ImVec2(
                 p0.x + (size.x - textSize.x) * 0.5f,
                 p0.y + (size.y - textSize.y) * 0.5f);
-            dl->AddText(textPos, IM_COL32(51, 65, 85, 255), label); // #334155 - Crisp dark slate text!
+            dl->AddText(textPos, IM_COL32(100, 116, 139, 255), label); // #64748b - Slate-500 neutral gray
         }
     }
     else if (isPrimaryCTA)
@@ -620,7 +620,7 @@ void LauncherView::Render(
         if (ModernButton(
                 "##play_btn",
                 lang::GetString("launcher_game_start").c_str(),
-                ImVec2(118, 50),
+                ImVec2(118, 58),
                 gameLocked,
                 IM_COL32(37, 99, 235, 255),
                 !gameLocked))
