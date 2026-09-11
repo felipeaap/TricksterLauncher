@@ -2,7 +2,7 @@ name: Windows build
 
 on:
   push:
-    branches: [ main, chore/phase-1-repository-cleanup ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -26,3 +26,22 @@ jobs:
 
       - name: Build Release Win32
         run: msbuild "Trickster Launcher.sln" /m /p:Configuration=Release /p:Platform=Win32 /p:RestorePackagesConfig=true
+
+      - name: Upload Launcher binaries
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trickster-launcher-release
+          path: |
+            Output/Trickster Launcher/Splash.exe
+            Output/Trickster Launcher/LauncherUpdater.exe
+            Output/Trickster Launcher/WebView2Loader.dll
+          retention-days: 30
+
+      - name: Upload FileListGen
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: filelistgen-release
+          path: Output/FileListGen/FileListGen.exe
+          retention-days: 30

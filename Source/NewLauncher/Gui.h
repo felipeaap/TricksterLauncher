@@ -47,13 +47,7 @@ namespace gui
     extern LPDIRECT3DTEXTURE9 exit_n, exit_h, exit_s;
     extern LPDIRECT3DTEXTURE9 game_n, game_h, game_s, game_g;
     extern LPDIRECT3DTEXTURE9 check_n, check_h, check_s, check_g;
-    extern std::atomic<float> g_iFileProgress, g_iTotalProgress;
-    extern std::mutex g_FileStringMutex;
-    extern std::string g_FileString;
-    extern std::mutex g_SpeedStringMutex;
-    extern std::string g_SpeedString;
-    extern wil::com_ptr<ICoreWebView2Controller> g_controller;
-    extern wil::com_ptr<ICoreWebView2> g_webview;
+    extern std::atomic<float> g_iFileProgress, g_iTotalProgress; // DEPRECATED: use LauncherState::
     IDirect3DTexture9* LoadTextureFromResource(HINSTANCE hInstance, int resourceId, int desiredWidth, int desiredHeight) noexcept;
     TexturePair LoadTexturePairFromResource(HINSTANCE hInstance, int resourceId, int desiredWidth, int desiredHeight) noexcept;
     void LoadResources() noexcept;

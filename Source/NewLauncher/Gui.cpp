@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Gui.h"
 #include <vector>
 #include <string>
@@ -9,6 +9,7 @@
 #include "Helper.h"
 #include "Language.h"
 #include "Config.h"
+#include "LauncherState.h"
 #include "RendererD3D9.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -24,12 +25,6 @@ namespace gui
 	ImFont* Small = new ImFont();
 	ImFont* Regular = new ImFont();
 	Helper* helper = nullptr;
-	std::atomic<float> g_iFileProgress{ 0.f };
-	std::atomic<float> g_iTotalProgress{ 0.f };
-	std::mutex g_FileStringMutex;
-	std::string g_FileString;
-	std::mutex g_SpeedStringMutex;
-	std::string g_SpeedString = "0 B/s";
 	LPDIRECT3DTEXTURE9 bgTex = nullptr, logoTex = nullptr;
 	LPDIRECT3DTEXTURE9 option_n = nullptr, option_h = nullptr, option_s = nullptr, option_g = nullptr;
 	LPDIRECT3DTEXTURE9 exit_n = nullptr, exit_h = nullptr, exit_s = nullptr;
@@ -468,8 +463,8 @@ void gui::Render() noexcept
 		ImGui::Image((ImTextureID)logoTex, ImVec2(185, 71));
 		ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_PlotHistogramHovered, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-		float fileProgress = g_iFileProgress.load(std::memory_order_relaxed);
-		float totalProgress = g_iTotalProgress.load(std::memory_order_relaxed);
+		float fileProgress = LauncherState::fileProgress.load(std::memory_order_relaxed);
+		float totalProgress = LauncherState::totalProgress.load(std::memory_order_relaxed);
 		ImGui::SetCursorPos(ImVec2(24, (winSize.y - 165)));
 		ImGui::ProgressBar(fileProgress, ImVec2(362, 7), " ");
 		ImGui::PopStyleColor(2);
@@ -484,10 +479,10 @@ void gui::Render() noexcept
 		auto now = std::chrono::steady_clock::now();
 		if (now - lastStringUpdate > std::chrono::milliseconds(100))
 		{
-			std::lock_guard<std::mutex> lockFile(g_FileStringMutex);
-			cachedFileString = g_FileString;
-			std::lock_guard<std::mutex> lockSpeed(g_SpeedStringMutex);
-			cachedSpeedString = g_SpeedString;
+			std::lock_guard<std::mutex> lockFile(LauncherState::fileStringMutex);
+			cachedFileString = LauncherState::fileString;
+			std::lock_guard<std::mutex> lockSpeed(LauncherState::speedStringMutex);
+			cachedSpeedString = LauncherState::speedString;
 			lastStringUpdate = now;
 		}
 		ImGui::Text("%s", cachedFileString.c_str());
