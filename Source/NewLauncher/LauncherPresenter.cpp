@@ -211,51 +211,66 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
 
     workerThread_ = std::thread([this, isFullCheck]()
     {
-        UpdateCoordinator coordinator(
-            [this](const std::string& path)
-            {
-                return FetchFromCDN(path);
-            },
-            [](const std::string& fileName)
+        try
+        {
+            UpdateCoordinator coordinator(
+                [this](const std::string& path)
+                {
+                    return FetchFromCDN(path);
+                },
+                [](const std::string& fileName)
+                {
+                    std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
+                    LauncherState::fileString = lang::GetString("splash_check") + fileName;
+                },
+                [](float fileProgress, float totalProgress)
+                {
+                    LauncherState::fileProgress.store(fileProgress, std::memory_order_relaxed);
+                    LauncherState::totalProgress.store(totalProgress, std::memory_order_relaxed);
+                });
+
             {
                 std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
-                LauncherState::fileString = lang::GetString("splash_check") + fileName;
-            },
-            [](float fileProgress, float totalProgress)
-            {
-                LauncherState::fileProgress.store(fileProgress, std::memory_order_relaxed);
-                LauncherState::totalProgress.store(totalProgress, std::memory_order_relaxed);
-            });
-
-        {
-            std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
-            LauncherState::fileString = lang::GetString("launcher_filelist_building");
-        }
-
-        localVersion_ = VersionManager::Load();
-
-        coordinator.Check(
-            fileList_,
-            isFullCheck,
-            localVersion_,
-            currentVersion_,
-            updateCount_);
-
-        const bool success = RunInstaller(fileList_, updateCount_);
-        isWorkerDone_.store(success, std::memory_order_release);
-        isRunning_.store(false, std::memory_order_release);
-        if (success)
-        {
-            VersionManager::Save(currentVersion_);
-        }
-        else
-        {
-            std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
-            if (LauncherState::fileString.find("complete") == std::string::npos &&
-                LauncherState::fileString.find("Complete") == std::string::npos)
-            {
-                LauncherState::fileString = lang::GetString("launcher_update_download_fail");
+                LauncherState::fileString = lang::GetString("launcher_filelist_building");
             }
+
+            localVersion_ = VersionManager::Load();
+
+            coordinator.Check(
+                fileList_,
+                isFullCheck,
+                localVersion_,
+                currentVersion_,
+                updateCount_);
+
+            const bool success = RunInstaller(fileList_, updateCount_);
+            isWorkerDone_.store(success, std::memory_order_release);
+            isRunning_.store(false, std::memory_order_release);
+            if (success)
+            {
+                VersionManager::Save(currentVersion_);
+            }
+            else
+            {
+                std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
+                if (LauncherState::fileString.find("complete") == std::string::npos &&
+                    LauncherState::fileString.find("Complete") == std::string::npos)
+                {
+                    LauncherState::fileString = lang::GetString("launcher_update_download_fail");
+                }
+            }
+        }
+        catch (const std::exception& ex)
+        {
+            Logger::LogError(std::string("Worker thread exception: ") + ex.what());
+            isWorkerDone_.store(false, std::memory_order_release);
+            isRunning_.store(false, std::memory_order_release);
+        }
+        catch (...)
+        {
+            Logger::LogError("Worker thread unknown exception");
+            isWorkerDone_.store(false, std::memory_order_release);
+            isRunning_.store(false, std::memory_order_release);
         }
     });
 }

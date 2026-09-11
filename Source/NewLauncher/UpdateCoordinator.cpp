@@ -29,7 +29,10 @@ void UpdateCoordinator::Check(std::vector<Arquivo>& files,
             ? std::min(static_cast<float>(current) / static_cast<float>(total), 1.0f)
             : 1.0f;
 
-        const std::string fileName = file.FilePath.substr(file.FilePath.find_last_of("/\\") + 1);
+        const auto sep = file.FilePath.find_last_of("/\\");
+        const std::string fileName = (sep == std::string::npos)
+            ? file.FilePath
+            : file.FilePath.substr(sep + 1);
         if (progress_)
             progress_(percent, percent);
         if (message_)

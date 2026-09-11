@@ -29,7 +29,7 @@ int FileVerifier::CountUpdates(std::vector<Arquivo>& files) const
     std::atomic<int> updates{ 0 };
     std::atomic<size_t> count{ 0 };
 
-    std::for_each(std::execution::par_unseq, files.begin(), files.end(),
+    std::for_each(std::execution::par, files.begin(), files.end(),
         [&](Arquivo& file)
         {
             g_fileSemaphore.acquire();
