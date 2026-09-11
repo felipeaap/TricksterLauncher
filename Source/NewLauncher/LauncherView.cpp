@@ -155,22 +155,34 @@ void LauncherView::RenderBeveledProgressBar(
         ImU32 colTopCrest = (colTop & 0x00FFFFFF) | (static_cast<ImU32>((colTop >> 24) * 0.7f) << 24);
         dl->AddRectFilled(barP0, ImVec2(barP1.x, barP0.y + barH * 0.28f), colTopCrest, barRounding, topCornerFlags);
 
-        // Animated soft wave shimmer gliding across the bar
+        // Animated diagonal wave shimmer gliding smoothly and briskly across the bar
         const float t = static_cast<float>(ImGui::GetTime());
-        const float shimmerPhase = fmodf(t * 0.65f, 2.0f) - 0.5f;
-        const float shimmerCenter = barP0.x + maxBarW * shimmerPhase;
-        const float shimmerWidth = 32.0f;
-        const float sMinX = (std::max)(barP0.x, shimmerCenter - shimmerWidth * 0.5f);
-        const float sMaxX = (std::min)(barP1.x, shimmerCenter + shimmerWidth * 0.5f);
-        if (sMaxX > sMinX)
-        {
-            dl->AddRectFilled(
-                ImVec2(sMinX, barP0.y),
-                ImVec2(sMaxX, barP1.y),
-                IM_COL32(255, 255, 255, 28),
-                barRounding,
-                topCornerFlags);
-        }
+        const float skewX = barH * 0.75f;
+        const float shimmerPhase = fmodf(t * 1.15f, 1.8f) - 0.4f;
+        const float shimmerCenter = barP0.x + (maxBarW + skewX * 2.0f) * shimmerPhase - skewX;
+        const float shimmerWidth = 24.0f;
+        const float coreWidth = 10.0f;
+
+        // Clip the diagonal sheen cleanly to the progress bar's filled bounds
+        dl->PushClipRect(barP0, barP1, true);
+
+        // Soft outer diagonal beam
+        dl->AddQuadFilled(
+            ImVec2(shimmerCenter + skewX - shimmerWidth * 0.5f, barP0.y),
+            ImVec2(shimmerCenter + skewX + shimmerWidth * 0.5f, barP0.y),
+            ImVec2(shimmerCenter - skewX + shimmerWidth * 0.5f, barP1.y),
+            ImVec2(shimmerCenter - skewX - shimmerWidth * 0.5f, barP1.y),
+            IM_COL32(255, 255, 255, 24));
+
+        // Bright inner diagonal core beam
+        dl->AddQuadFilled(
+            ImVec2(shimmerCenter + skewX - coreWidth * 0.5f, barP0.y),
+            ImVec2(shimmerCenter + skewX + coreWidth * 0.5f, barP0.y),
+            ImVec2(shimmerCenter - skewX + coreWidth * 0.5f, barP1.y),
+            ImVec2(shimmerCenter - skewX - coreWidth * 0.5f, barP1.y),
+            IM_COL32(255, 255, 255, 48));
+
+        dl->PopClipRect();
 
         // Soft pulse on the leading tip when progressing
         if (f > 0.02f && f < 0.999f)
