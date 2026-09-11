@@ -18,13 +18,13 @@ void LauncherView::Initialize() noexcept
     ImGuiStyle& style = ImGui::GetStyle();
     style.Colors[ImGuiCol_Text] = ImVec4(0.09f, 0.14f, 0.22f, 1.0f);
     style.Colors[ImGuiCol_WindowBg] = ImVec4(0.92f, 0.96f, 0.99f, 1.0f);
-    style.WindowRounding = 8.0f;
+    style.WindowRounding = 10.0f;
     style.WindowBorderSize = 0.0f;
     style.WindowPadding = ImVec2(0, 0);
 
     char windowsDir[MAX_PATH]{};
     GetWindowsDirectoryA(windowsDir, MAX_PATH);
-    std::string fontPath = std::string(windowsDir) + "\\Fonts\\segoeuib.ttf";
+    std::string fontBoldPath = std::string(windowsDir) + "\\Fonts\\segoeuib.ttf";
     std::string fontRegPath = std::string(windowsDir) + "\\Fonts\\segoeui.ttf";
 
     ImGuiIO& io = ImGui::GetIO();
@@ -32,7 +32,7 @@ void LauncherView::Initialize() noexcept
     const ImWchar* glyphRanges = io.Fonts->GetGlyphRangesChineseFull();
     const float baseFontSize = 15.0f;
     const float smallFontSize = 12.0f;
-    const float boldFontSize = 16.0f;
+    const float boldFontSize = 17.0f;
 
     auto LoadFont = [&](const char* path, float size) -> ImFont*
     {
@@ -43,13 +43,13 @@ void LauncherView::Initialize() noexcept
 
     fontSmall_ = LoadFont(fontRegPath.c_str(), smallFontSize);
     if (!fontSmall_)
-        fontSmall_ = LoadFont(fontPath.c_str(), smallFontSize);
+        fontSmall_ = LoadFont(fontBoldPath.c_str(), smallFontSize);
 
     fontRegular_ = LoadFont(fontRegPath.c_str(), baseFontSize);
     if (!fontRegular_)
-        fontRegular_ = LoadFont(fontPath.c_str(), baseFontSize);
+        fontRegular_ = LoadFont(fontBoldPath.c_str(), baseFontSize);
 
-    fontBold_ = LoadFont(fontPath.c_str(), boldFontSize);
+    fontBold_ = LoadFont(fontBoldPath.c_str(), boldFontSize);
 
     io.FontDefault = fontRegular_ ? fontRegular_ : (io.Fonts->Fonts.empty() ? nullptr : io.Fonts->Fonts[0]);
     io.Fonts->Build();
@@ -72,15 +72,15 @@ bool LauncherView::ModernButton(
     ImVec2 p1 = ImGui::GetItemRectMax();
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
-    const float rounding = (std::min)(size.y * 0.5f, 16.0f); // Pill rounded shape
+    const float rounding = (std::min)(size.y * 0.5f, 18.0f); // Full smooth pill shape
     const float t = static_cast<float>(ImGui::GetTime());
-    const bool isPrimaryCTA = (accentColor != IM_COL32(0, 162, 237, 255) && accentColor != IM_COL32(239, 68, 68, 255)) || pulseGlow;
+    const bool isPrimaryCTA = (accentColor == IM_COL32(37, 99, 235, 255)) || pulseGlow;
 
     if (isLocked)
     {
         // Light muted slate pill
-        dl->AddRectFilled(p0, p1, IM_COL32(241, 245, 249, 210), rounding);
-        dl->AddRect(p0, p1, IM_COL32(203, 213, 225, 180), rounding, 0, 1.0f);
+        dl->AddRectFilled(p0, p1, IM_COL32(241, 245, 249, 230), rounding);
+        dl->AddRect(p0, p1, IM_COL32(203, 213, 225, 200), rounding, 0, 1.0f);
 
         if (label && *label)
         {
@@ -88,7 +88,7 @@ bool LauncherView::ModernButton(
             ImVec2 textPos = ImVec2(
                 p0.x + (size.x - textSize.x) * 0.5f,
                 p0.y + (size.y - textSize.y) * 0.5f);
-            dl->AddText(textPos, IM_COL32(148, 163, 184, 200), label);
+            dl->AddText(textPos, IM_COL32(148, 163, 184, 220), label);
         }
     }
     else if (isPrimaryCTA)
@@ -98,10 +98,10 @@ bool LauncherView::ModernButton(
         {
             const float pulseAlpha = (sinf(t * 3.5f) * 0.5f + 0.5f) * 80.0f + 40.0f;
             dl->AddRect(
-                ImVec2(p0.x - 2.5f, p0.y - 2.5f),
-                ImVec2(p1.x + 2.5f, p1.y + 2.5f),
+                ImVec2(p0.x - 3.0f, p0.y - 3.0f),
+                ImVec2(p1.x + 3.0f, p1.y + 3.0f),
                 IM_COL32(37, 99, 235, static_cast<int>(pulseAlpha)),
-                rounding + 2.5f,
+                rounding + 3.0f,
                 0,
                 2.0f);
         }
@@ -109,8 +109,8 @@ bool LauncherView::ModernButton(
         // Soft outer blue drop-shadow
         dl->AddRectFilled(
             ImVec2(p0.x + 1.0f, p0.y + 2.0f),
-            ImVec2(p1.x - 1.0f, p1.y + 3.5f),
-            IM_COL32(30, 64, 175, 45),
+            ImVec2(p1.x - 1.0f, p1.y + 4.0f),
+            IM_COL32(30, 64, 175, 50),
             rounding);
 
         // Gradient Fill
@@ -137,12 +137,12 @@ bool LauncherView::ModernButton(
         dl->AddRectFilled(
             p0,
             ImVec2(p1.x, p0.y + size.y * 0.45f),
-            IM_COL32(255, 255, 255, hovered ? 55 : 35),
+            IM_COL32(255, 255, 255, hovered ? 60 : 35),
             rounding,
             ImDrawFlags_RoundCornersTop);
 
         // Delicate luminous border
-        dl->AddRect(p0, p1, IM_COL32(147, 197, 253, 180), rounding, 0, 1.0f);
+        dl->AddRect(p0, p1, IM_COL32(147, 197, 253, 200), rounding, 0, 1.0f);
 
         // Crisp White Typography with soft depth
         if (label && *label)
@@ -165,13 +165,13 @@ bool LauncherView::ModernButton(
         // Soft ambient card shadow
         dl->AddRectFilled(
             ImVec2(p0.x, p0.y + 1.0f),
-            ImVec2(p1.x, p1.y + 2.0f),
+            ImVec2(p1.x, p1.y + 2.5f),
             IM_COL32(50, 80, 120, 25),
             rounding);
 
         // Base fill (Clean pure white or soft hover wash)
-        ImU32 baseFill = IM_COL32(255, 255, 255, 250);
-        ImU32 borderCol = IM_COL32(203, 213, 225, 220); // #cbd5e1
+        ImU32 baseFill = IM_COL32(255, 255, 255, 255);
+        ImU32 borderCol = IM_COL32(203, 213, 225, 230); // #cbd5e1
 
         if (held)
         {
@@ -219,52 +219,8 @@ bool LauncherView::ImageButton(
     const char* fallbackLabel,
     ImU32 fallbackAccent) noexcept
 {
-    // If bitmap textures are missing, render the modern procedural light-theme button
-    if (!normal && !locked)
-    {
-        return ModernButton(id, fallbackLabel ? fallbackLabel : id, size, isLocked, fallbackAccent);
-    }
-
-    ImGui::PushID(id);
-    bool pressedResult = ImGui::InvisibleButton("##btn", size);
-    bool hovered = ImGui::IsItemHovered();
-    bool held = ImGui::IsItemActive();
-    ImVec2 min = ImGui::GetItemRectMin();
-    ImVec2 max = ImGui::GetItemRectMax();
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-
-    ImTextureID tex = reinterpret_cast<ImTextureID>(normal);
-    if (!isLocked)
-    {
-        if (held && pressed)
-            tex = reinterpret_cast<ImTextureID>(pressed);
-        else if (hovered && hover)
-            tex = reinterpret_cast<ImTextureID>(hover);
-    }
-    else if (locked)
-    {
-        tex = reinterpret_cast<ImTextureID>(locked);
-    }
-
-    if (tex)
-    {
-        if (hovered && !isLocked)
-        {
-            dl->AddRectFilled(
-                ImVec2(min.x, min.y),
-                ImVec2(max.x, max.y),
-                IM_COL32(59, 130, 246, 20),
-                8.0f);
-        }
-        dl->AddImage(tex, min, max);
-    }
-    else
-    {
-        ModernButton(id, fallbackLabel ? fallbackLabel : id, size, isLocked, fallbackAccent);
-    }
-
-    ImGui::PopID();
-    return pressedResult;
+    // Render the modern procedural vector pill button directly
+    return ModernButton(id, fallbackLabel ? fallbackLabel : id, size, isLocked, fallbackAccent);
 }
 
 void LauncherView::RenderLink(
@@ -272,7 +228,7 @@ void LauncherView::RenderLink(
     const char* url,
     const std::function<void(const std::string&)>& onClick) noexcept
 {
-    // Trickster Classic Amber/Orange Accent (like website heading highlight)
+    // Trickster Classic Amber/Orange Accent
     ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(217, 119, 6, 255));
     if (ImGui::Text("%s", label); ImGui::IsItemHovered())
     {
@@ -303,7 +259,7 @@ void LauncherView::RenderBeveledProgressBar(
 
     const float pillRounding = (std::min)(size.y * 0.5f, rounding);
 
-    // 1. Light Sky-Blue Sunken Capsule Track (like website pill badge)
+    // 1. Light Sky-Blue Sunken Capsule Track
     dl->AddRectFilled(
         ImVec2(p0.x - 0.5f, p0.y - 0.5f),
         ImVec2(p1.x + 0.5f, p1.y + 0.5f),
@@ -341,7 +297,7 @@ void LauncherView::RenderBeveledProgressBar(
         dl->AddRectFilled(
             barP0,
             ImVec2(barP1.x, barP0.y + barH * 0.5f),
-            IM_COL32(255, 255, 255, 65),
+            IM_COL32(255, 255, 255, 70),
             barRounding,
             topCornerFlags);
 
@@ -361,7 +317,7 @@ void LauncherView::RenderBeveledProgressBar(
             ImVec2(shimmerCenter + skewX + shimmerWidth * 0.5f, barP0.y),
             ImVec2(shimmerCenter - skewX + shimmerWidth * 0.5f, barP1.y),
             ImVec2(shimmerCenter - skewX - shimmerWidth * 0.5f, barP1.y),
-            IM_COL32(255, 255, 255, 50));
+            IM_COL32(255, 255, 255, 55));
 
         // Bright inner diagonal core beam
         dl->AddQuadFilled(
@@ -369,7 +325,7 @@ void LauncherView::RenderBeveledProgressBar(
             ImVec2(shimmerCenter + skewX + coreWidth * 0.5f, barP0.y),
             ImVec2(shimmerCenter - skewX + coreWidth * 0.5f, barP1.y),
             ImVec2(shimmerCenter - skewX - coreWidth * 0.5f, barP1.y),
-            IM_COL32(255, 255, 255, 90));
+            IM_COL32(255, 255, 255, 95));
 
         dl->PopClipRect();
 
@@ -396,7 +352,6 @@ void LauncherView::RenderBeveledProgressBar(
         ImVec2 pctSize = ImGui::CalcTextSize(pctBuf);
         ImVec2 pctPos = ImVec2(p0.x + (size.x - pctSize.x) * 0.5f, p0.y + (size.y - pctSize.y) * 0.5f);
 
-        // High contrast percentage
         dl->AddText(ImVec2(pctPos.x + 0.5f, pctPos.y + 0.5f), IM_COL32(15, 23, 42, 160), pctBuf);
         dl->AddText(pctPos, IM_COL32(255, 255, 255, 255), pctBuf);
     }
@@ -453,26 +408,19 @@ void LauncherView::Render(
             IM_COL32(224, 242, 254, 255)  // Bottom Left: Soft Sky Mist (#e0f2fe)
         );
 
-        // If theme background texture exists, draw it with smooth blending
-        if (textures.Background())
-        {
-            dl->AddImage(
-                reinterpret_cast<ImTextureID>(textures.Background()),
-                ImVec2(0, 0),
-                winSize);
-        }
-
         // Window Perimeter Border with delicate sky blue stroke
         dl->AddRect(ImVec2(0, 0), winSize, IM_COL32(186, 215, 243, 230), 0.0f, 0, 1.0f);
 
-        // 2. Custom Clean Title Bar (0..30px Y - Translucent White Cloud Glass)
-        dl->AddRectFilled(ImVec2(0, 0), ImVec2(winSize.x, 30), IM_COL32(255, 255, 255, 190));
-        dl->AddLine(ImVec2(0, 30), ImVec2(winSize.x, 30), IM_COL32(215, 230, 245, 200), 1.0f);
+        // 2. Custom Clean Title Bar (0..32px Y - Translucent White Cloud Glass)
+        dl->AddRectFilled(ImVec2(0, 0), ImVec2(winSize.x, 32), IM_COL32(255, 255, 255, 210));
+        dl->AddLine(ImVec2(0, 32), ImVec2(winSize.x, 32), IM_COL32(215, 230, 245, 220), 1.0f);
 
-        // Brand Title
-        ImGui::SetCursorPos(ImVec2(14, 6));
+        // Brand Title Badge (e.g. "★ Trickster Classic")
+        ImGui::SetCursorPos(ImVec2(14, 7));
         if (fontBold_) ImGui::PushFont(fontBold_);
-        ImGui::TextColored(ImVec4(0.09f, 0.17f, 0.29f, 1.0f), "%s", config::SubTitle.c_str());
+        ImGui::TextColored(ImVec4(0.12f, 0.22f, 0.38f, 1.0f), "Trickster");
+        ImGui::SameLine(0, 5.0f);
+        ImGui::TextColored(ImVec4(0.92f, 0.45f, 0.05f, 1.0f), "Classic");
         if (fontBold_) ImGui::PopFont();
 
         // Server Status Pill Badge (Light Blue Capsule like website "ศูนย์ข่าวเซิร์ฟเวอร์")
@@ -485,14 +433,14 @@ void LauncherView::Render(
         const float pillX = winSize.x - 72.0f - pillW;
 
         dl->AddRectFilled(
-            ImVec2(pillX, 5),
-            ImVec2(pillX + pillW, 25),
-            isMaint ? IM_COL32(254, 226, 226, 230) : IM_COL32(219, 234, 254, 230),
+            ImVec2(pillX, 6),
+            ImVec2(pillX + pillW, 26),
+            isMaint ? IM_COL32(254, 226, 226, 240) : IM_COL32(219, 234, 254, 240),
             10.0f);
         dl->AddRect(
-            ImVec2(pillX, 5),
-            ImVec2(pillX + pillW, 25),
-            isMaint ? IM_COL32(252, 165, 165, 220) : IM_COL32(147, 197, 253, 220),
+            ImVec2(pillX, 6),
+            ImVec2(pillX + pillW, 26),
+            isMaint ? IM_COL32(252, 165, 165, 230) : IM_COL32(147, 197, 253, 230),
             10.0f,
             0,
             1.0f);
@@ -502,17 +450,17 @@ void LauncherView::Render(
         ImU32 dotCol = isMaint
             ? IM_COL32(239, 68, 68, static_cast<int>(pulseDot))
             : IM_COL32(16, 185, 129, static_cast<int>(pulseDot));
-        dl->AddCircleFilled(ImVec2(pillX + 9, 15), 3.5f, dotCol);
+        dl->AddCircleFilled(ImVec2(pillX + 9, 16), 3.5f, dotCol);
 
         if (fontSmall_) ImGui::PushFont(fontSmall_);
         dl->AddText(
-            ImVec2(pillX + 17, 7.5f),
+            ImVec2(pillX + 17, 8.5f),
             isMaint ? IM_COL32(220, 38, 38, 255) : IM_COL32(29, 78, 216, 255),
             statusText);
         if (fontSmall_) ImGui::PopFont();
 
         // Minimize Button ("-")
-        ImGui::SetCursorPos(ImVec2(winSize.x - 64, 4));
+        ImGui::SetCursorPos(ImVec2(winSize.x - 64, 5));
         ImGui::PushID("##title_min");
         if (ImGui::InvisibleButton("##btn_min", ImVec2(26, 22)))
         {
@@ -523,12 +471,12 @@ void LauncherView::Render(
         ImVec2 minP0 = ImGui::GetItemRectMin();
         ImVec2 minP1 = ImGui::GetItemRectMax();
         if (minHovered)
-            dl->AddRectFilled(minP0, minP1, IM_COL32(226, 232, 240, 220), 4.0f);
+            dl->AddRectFilled(minP0, minP1, IM_COL32(226, 232, 240, 240), 5.0f);
         dl->AddLine(ImVec2(minP0.x + 7, minP0.y + 11), ImVec2(minP1.x - 7, minP0.y + 11), IM_COL32(71, 85, 105, 240), 1.5f);
         ImGui::PopID();
 
         // Close Button ("✕")
-        ImGui::SetCursorPos(ImVec2(winSize.x - 34, 4));
+        ImGui::SetCursorPos(ImVec2(winSize.x - 34, 5));
         ImGui::PushID("##title_close");
         if (ImGui::InvisibleButton("##btn_close", ImVec2(26, 22)))
         {
@@ -541,7 +489,7 @@ void LauncherView::Render(
         ImVec2 closeP0 = ImGui::GetItemRectMin();
         ImVec2 closeP1 = ImGui::GetItemRectMax();
         if (closeHovered)
-            dl->AddRectFilled(closeP0, closeP1, IM_COL32(244, 63, 94, 230), 4.0f);
+            dl->AddRectFilled(closeP0, closeP1, IM_COL32(244, 63, 94, 230), 5.0f);
         dl->AddLine(
             ImVec2(closeP0.x + 8, closeP0.y + 6),
             ImVec2(closeP1.x - 8, closeP1.y - 6),
@@ -554,37 +502,73 @@ void LauncherView::Render(
             1.5f);
         ImGui::PopID();
 
-        // 3. News WebView Card Frame (Clean Floating White Card like website news container)
-        // Card Outer Drop Shadow
+        // 3. News WebView Floating Card Frame (16, 38, 522, 376)
         dl->AddRectFilled(
-            ImVec2(18.0f, 32.0f),
-            ImVec2(524.0f, 378.0f),
-            IM_COL32(30, 70, 120, 25),
+            ImVec2(17.0f, 37.0f),
+            ImVec2(523.0f, 377.0f),
+            IM_COL32(30, 70, 120, 20),
             8.0f);
-        // Card Border
         dl->AddRect(
-            ImVec2(18.0f, 31.0f),
-            ImVec2(523.0f, 376.0f),
-            IM_COL32(215, 228, 242, 240),
+            ImVec2(17.0f, 36.0f),
+            ImVec2(522.0f, 376.0f),
+            IM_COL32(215, 228, 242, 255),
             8.0f,
             0,
             1.0f);
 
-        // Logo
-        if (textures.Logo())
-        {
-            ImGui::SetCursorPos(ImVec2(11, winSize.y - 98));
-            ImGui::Image(
-                reinterpret_cast<ImTextureID>(textures.Logo()),
-                ImVec2(185, 71));
-        }
+        // 4. Bottom Floating Card (Housing Progress, Telemetry and Controls)
+        const float bottomCardY = 384.0f;
+        const float bottomCardH = winSize.y - bottomCardY - 8.0f;
+        dl->AddRectFilled(
+            ImVec2(14.0f, bottomCardY),
+            ImVec2(winSize.x - 14.0f, bottomCardY + bottomCardH),
+            IM_COL32(255, 255, 255, 235),
+            12.0f);
+        dl->AddRect(
+            ImVec2(14.0f, bottomCardY),
+            ImVec2(winSize.x - 14.0f, bottomCardY + bottomCardH),
+            IM_COL32(215, 230, 248, 240),
+            12.0f,
+            0,
+            1.0f);
 
-        // 4. Progress Bars Area
+        // Status text & download speed chip
+        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 10));
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(ImVec4(0.12f, 0.20f, 0.32f, 0.95f), "%s", state.fileString.c_str());
+
+        if (!state.speedString.empty())
+        {
+            ImVec2 textSize = ImGui::CalcTextSize(state.speedString.c_str());
+            const float chipW = textSize.x + 16.0f;
+            const float chipX = winSize.x - chipW - 28.0f;
+            const float chipY = bottomCardY + 8.0f;
+
+            // Speed Chip Pill (Light Sky Blue Pill)
+            dl->AddRectFilled(
+                ImVec2(chipX, chipY),
+                ImVec2(chipX + chipW, chipY + 18),
+                IM_COL32(219, 234, 254, 240),
+                9.0f);
+            dl->AddRect(
+                ImVec2(chipX, chipY),
+                ImVec2(chipX + chipW, chipY + 18),
+                IM_COL32(147, 197, 253, 230),
+                9.0f,
+                0,
+                1.0f);
+
+            ImGui::SetCursorPos(ImVec2(chipX + 8, chipY + 2));
+            ImGui::TextColored(ImVec4(0.11f, 0.31f, 0.85f, 1.0f), "%s", state.speedString.c_str());
+        }
+        if (fontSmall_) ImGui::PopFont();
+
+        // Dual Progress Bars
         // Progress bar 1: File progress (Soft Sky-Blue Capsule)
-        ImGui::SetCursorPos(ImVec2(24, winSize.y - 166));
+        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 30));
         RenderBeveledProgressBar(
             animFileProgress_,
-            ImVec2(362, 8),
+            ImVec2(348, 8),
             IM_COL32(147, 197, 253, 255), // #93c5fd
             IM_COL32(96, 165, 250, 255),  // #60a5fa
             IM_COL32(255, 255, 255, 160),
@@ -594,10 +578,10 @@ void LauncherView::Render(
             false);
 
         // Progress bar 2: Total progress (Vibrant Cerulean/Royal Blue Capsule with Percentage)
-        ImGui::SetCursorPos(ImVec2(24, winSize.y - 154));
+        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 42));
         RenderBeveledProgressBar(
             animTotalProgress_,
-            ImVec2(362, 14),
+            ImVec2(348, 14),
             IM_COL32(56, 189, 248, 255),  // #38bdf8
             IM_COL32(37, 99, 235, 255),   // #2563eb
             IM_COL32(255, 255, 255, 180),
@@ -606,95 +590,59 @@ void LauncherView::Render(
             7.0f,
             true);
 
-        // Status text & download speed chip
-        ImGui::SetCursorPos(ImVec2(23, winSize.y - 186));
-        if (fontSmall_) ImGui::PushFont(fontSmall_);
-        ImGui::TextColored(ImVec4(0.09f, 0.17f, 0.29f, 0.95f), "%s", state.fileString.c_str());
-
-        if (!state.speedString.empty())
+        // Primary Action: Big Game Start Button (Vibrant Royal Blue Pill like website เข้าสู่ระบบ)
+        ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 24));
+        const bool gameLocked = !state.isGameEnabled;
+        if (ModernButton(
+                "##play_btn",
+                lang::GetString("launcher_game_start").c_str(),
+                ImVec2(118, 52),
+                gameLocked,
+                IM_COL32(37, 99, 235, 255),
+                !gameLocked))
         {
-            ImVec2 textSize = ImGui::CalcTextSize(state.speedString.c_str());
-            const float chipW = textSize.x + 14.0f;
-            const float chipX = winSize.x - chipW - 24.0f;
-            const float chipY = winSize.y - 188.0f;
-
-            // Speed Chip Pill (Light Sky Blue Pill)
-            dl->AddRectFilled(
-                ImVec2(chipX, chipY),
-                ImVec2(chipX + chipW, chipY + 18),
-                IM_COL32(219, 234, 254, 230),
-                9.0f);
-            dl->AddRect(
-                ImVec2(chipX, chipY),
-                ImVec2(chipX + chipW, chipY + 18),
-                IM_COL32(147, 197, 253, 220),
-                9.0f,
-                0,
-                1.0f);
-
-            ImGui::SetCursorPos(ImVec2(chipX + 7, chipY + 2));
-            ImGui::TextColored(ImVec4(0.11f, 0.31f, 0.85f, 1.0f), "%s", state.speedString.c_str());
+            if (!gameLocked && events.onPlayClicked)
+                events.onPlayClicked();
         }
-        if (fontSmall_) ImGui::PopFont();
 
-        // Website Link Footer
-        ImGui::SetCursorPos(ImVec2(winSize.x - 328, winSize.y - 76));
-        if (fontSmall_) ImGui::PushFont(fontSmall_);
-        ImGui::TextColored(ImVec4(0.28f, 0.35f, 0.45f, 0.9f), "%s", lang::GetString("launcher_site_desc").c_str());
+        // Secondary Action Buttons (Check, Options, Exit) - Floating White Pill Buttons
+        const float btnY = bottomCardY + 66.0f;
+        const float btnW = 108.0f;
+        const float btnH = 28.0f;
 
-        ImGui::SetCursorPos(ImVec2(winSize.x - 328, winSize.y - 60));
-        RenderLink(
-            lang::GetString("launcher_site_click").c_str(),
-            config::WebsiteLink.c_str(),
-            events.onLinkClicked);
-        if (fontSmall_) ImGui::PopFont();
-
-        // 5. Action Buttons (Check, Options, Exit) - Floating White Pill Buttons
         // Button: Check Files
-        ImGui::SetCursorPos(ImVec2(23, winSize.y - 132));
+        ImGui::SetCursorPos(ImVec2(28, btnY));
         const bool checkLocked = !state.isCheckEnabled;
-        if (ImageButton(
+        if (ModernButton(
+                "##btn_check",
                 lang::GetString("launcher_check").c_str(),
-                textures.CheckNormal(),
-                textures.CheckHover(),
-                textures.CheckSelected(),
-                textures.CheckGray(),
-                ImVec2(113, 28),
-                checkLocked,
-                lang::GetString("launcher_check").c_str()))
+                ImVec2(btnW, btnH),
+                checkLocked))
         {
             if (!checkLocked && events.onCheckClicked)
                 events.onCheckClicked();
         }
 
         // Button: Options
-        ImGui::SetCursorPos(ImVec2(150, winSize.y - 132));
+        ImGui::SetCursorPos(ImVec2(146, btnY));
         const bool optionLocked = !state.isOptionEnabled;
-        if (ImageButton(
+        if (ModernButton(
+                "##btn_options",
                 lang::GetString("launcher_options").c_str(),
-                textures.OptionNormal(),
-                textures.OptionHover(),
-                textures.OptionSelected(),
-                textures.OptionGray(),
-                ImVec2(113, 28),
-                optionLocked,
-                lang::GetString("launcher_options").c_str()))
+                ImVec2(btnW, btnH),
+                optionLocked))
         {
             if (!optionLocked && events.onOptionClicked)
                 events.onOptionClicked();
         }
 
         // Button: Exit
-        ImGui::SetCursorPos(ImVec2(274, winSize.y - 132));
-        if (ImageButton(
+        ImGui::SetCursorPos(ImVec2(264, btnY));
+        if (ModernButton(
+                "##btn_exit",
                 lang::GetString("launcher_exit").c_str(),
-                textures.ExitNormal(),
-                textures.ExitHover(),
-                textures.ExitSelected(),
-                textures.ExitSelected(),
-                ImVec2(113, 28),
+                ImVec2(btnW, btnH),
                 false,
-                lang::GetString("launcher_exit").c_str(),
                 IM_COL32(239, 68, 68, 255)))
         {
             if (events.onExitClicked)
@@ -703,53 +651,17 @@ void LauncherView::Render(
                 shouldClose_ = true;
         }
 
-        // 6. Primary Action: Big Game Start Button (Vibrant Royal Blue Pill)
-        ImGui::SetCursorPos(ImVec2(winSize.x - 139, winSize.y - 166));
-        const bool gameLocked = !state.isGameEnabled;
-        if (textures.GameNormal() || textures.GameGray())
-        {
-            if (!gameLocked)
-            {
-                const float pulseAlpha = (sinf(t * 4.0f) * 0.5f + 0.5f) * 70.0f + 35.0f;
-                dl->AddRect(
-                    ImVec2(winSize.x - 141, winSize.y - 168),
-                    ImVec2(winSize.x - 19, winSize.y - 103),
-                    IM_COL32(37, 99, 235, static_cast<int>(pulseAlpha)),
-                    16.0f,
-                    0,
-                    2.0f);
-            }
+        // 5. Footer: Website Link
+        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 104));
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(ImVec4(0.38f, 0.46f, 0.58f, 0.9f), "%s", lang::GetString("launcher_site_desc").c_str());
 
-            if (ImageButton(
-                    lang::GetString("launcher_game_start").c_str(),
-                    textures.GameNormal(),
-                    textures.GameHover(),
-                    textures.GameSelected(),
-                    textures.GameGray(),
-                    ImVec2(118, 61),
-                    gameLocked,
-                    lang::GetString("launcher_game_start").c_str(),
-                    IM_COL32(37, 99, 235, 255)))
-            {
-                if (!gameLocked && events.onPlayClicked)
-                    events.onPlayClicked();
-            }
-        }
-        else
-        {
-            // Vector Procedural Royal Blue Pill Button
-            if (ModernButton(
-                    "##play_btn",
-                    lang::GetString("launcher_game_start").c_str(),
-                    ImVec2(118, 61),
-                    gameLocked,
-                    IM_COL32(37, 99, 235, 255),
-                    !gameLocked))
-            {
-                if (!gameLocked && events.onPlayClicked)
-                    events.onPlayClicked();
-            }
-        }
+        ImGui::SameLine(0, 6.0f);
+        RenderLink(
+            lang::GetString("launcher_site_click").c_str(),
+            config::WebsiteLink.c_str(),
+            events.onLinkClicked);
+        if (fontSmall_) ImGui::PopFont();
 
         ImGui::End();
     }
