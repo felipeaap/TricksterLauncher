@@ -363,8 +363,8 @@ bool DownloadSingleWithResume(Client& client,
 
         if (attempt < options.maxRetries && options.retryDelayMilliseconds > 0)
         {
-            std::this_thread::sleep_for(
-                std::chrono::milliseconds(options.retryDelayMilliseconds));
+            const long long backoffMs = static_cast<long long>(options.retryDelayMilliseconds) * (1LL << std::min(attempt, 4));
+            std::this_thread::sleep_for(std::chrono::milliseconds(backoffMs));
         }
 
         error.clear();
@@ -383,6 +383,7 @@ bool DownloadMulti(const std::string& host,
                    long long totalSize,
                    const DownloadManager::ProgressCallback& progress,
                    const DownloadManager::SpeedCallback& speedCallback,
+                   const DownloadManager::ErrorCallback& errorCallback,
                    const DownloadManager::Options& options)
 {
     if (totalSize <= 0 || options.maxConnections < 2)
@@ -522,9 +523,15 @@ bool DownloadMulti(const std::string& host,
 
             if (attempt < options.maxRetries && options.retryDelayMilliseconds > 0)
             {
-                std::this_thread::sleep_for(
-                    std::chrono::milliseconds(options.retryDelayMilliseconds));
+                const long long backoffMs = static_cast<long long>(options.retryDelayMilliseconds) * (1LL << std::min(attempt, 4));
+                std::this_thread::sleep_for(std::chrono::milliseconds(backoffMs));
             }
+        }
+
+        if (errorCallback)
+        {
+            std::lock_guard<std::mutex> lock(callbackMutex);
+            errorCallback("Segment " + std::to_string(index) + " failed after retries: " + remotePath);
         }
 
         return false;
@@ -595,7 +602,8 @@ std::string DownloadManager::Get(const std::string& path) const
 bool DownloadManager::Download(const std::string& remotePath,
                                const std::string& localPath,
                                ProgressCallback progress,
-                               SpeedCallback speed) const
+                               SpeedCallback speed,
+                               ErrorCallback errorCallback) const
 {
     const std::filesystem::path destination(localPath);
     const auto partPath = MakePartPath(destination);
@@ -614,7 +622,11 @@ bool DownloadManager::Download(const std::string& remotePath,
     }
 
     if (info.size <= 0)
+    {
+        if (errorCallback)
+            errorCallback("Remote file unavailable or empty: " + remotePath);
         return false;
+    }
 
     bool success = false;
     if (info.rangeSupported &&
@@ -622,7 +634,7 @@ bool DownloadManager::Download(const std::string& remotePath,
         options_.maxConnections > 1)
     {
         success = DownloadMulti(host_, useSsl_, remotePath, partPath, metadataPath,
-                                info.size, progress, speed, options_);
+                                info.size, progress, speed, errorCallback, options_);
     }
     else if (info.rangeSupported)
     {
@@ -662,12 +674,18 @@ bool DownloadManager::Download(const std::string& remotePath,
     }
 
     if (!success)
+    {
+        if (errorCallback)
+            errorCallback("Download failed for: " + remotePath);
         return false;
+    }
 
     std::error_code error;
     if (!std::filesystem::exists(partPath, error) ||
         static_cast<long long>(std::filesystem::file_size(partPath, error)) != info.size || error)
     {
+        if (errorCallback)
+            errorCallback("Downloaded file size mismatch or missing part file for: " + remotePath);
         return false;
     }
 
@@ -675,7 +693,11 @@ bool DownloadManager::Download(const std::string& remotePath,
     error.clear();
     std::filesystem::rename(partPath, destination, error);
     if (error)
+    {
+        if (errorCallback)
+            errorCallback("Failed to move completed part file to final destination: " + destination.string());
         return false;
+    }
 
     std::filesystem::remove(metadataPath, error);
     if (progress)
@@ -685,3 +707,4 @@ bool DownloadManager::Download(const std::string& remotePath,
 
     return true;
 }
+

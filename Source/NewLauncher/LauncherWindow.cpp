@@ -70,11 +70,9 @@ bool LauncherWindow::Create(const wchar_t* title) noexcept
     ShowWindow(window_, SW_SHOWDEFAULT);
     UpdateWindow(window_);
 
-    // Temporary compatibility bridge for the remaining GUI layer. Window
-    // ownership itself remains entirely inside LauncherWindow.
-    gui::window = window_;
-    gui::windowClass.hInstance = instance_;
-    gui::windowClass.lpszClassName = kWindowClassName;
+    // Associate window with GUI subsystem
+    gui::SetWindow(window_);
+    gui::SetRunning(true);
 
     return true;
 }
@@ -95,8 +93,8 @@ void LauncherWindow::Destroy() noexcept
         classRegistered_ = false;
     }
 
-    if (gui::window == destroyedWindow)
-        gui::window = nullptr;
+    if (gui::GetWindow() == destroyedWindow)
+        gui::SetWindow(nullptr);
 
     instance_ = nullptr;
     running_ = false;
@@ -110,7 +108,7 @@ bool LauncherWindow::PumpMessages() noexcept
         if (message.message == WM_QUIT)
         {
             running_ = false;
-            gui::isRunning = false;
+            gui::SetRunning(false);
             return false;
         }
 
@@ -118,7 +116,7 @@ bool LauncherWindow::PumpMessages() noexcept
         DispatchMessage(&message);
     }
 
-    return running_ && gui::isRunning;
+    return running_ && gui::IsRunning();
 }
 
 LRESULT CALLBACK LauncherWindow::WindowProcess(
@@ -167,7 +165,7 @@ LRESULT LauncherWindow::HandleMessage(UINT message, WPARAM wideParameter, LPARAM
 
     case WM_DESTROY:
         running_ = false;
-        gui::isRunning = false;
+        gui::SetRunning(false);
         PostQuitMessage(0);
         return 0;
 

@@ -3,6 +3,7 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/bio.h>
+#include <openssl/rsa.h>
 
 #include <vector>
 
@@ -48,6 +49,62 @@ std::vector<unsigned char> Base64Decode(const std::string& value) noexcept
 
 namespace manifest_security
 {
+bool GenerateKeyPair(std::string& outPrivateKeyPem, std::string& outPublicKeyPem) noexcept
+{
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, nullptr);
+    if (!ctx)
+        return false;
+
+    if (EVP_PKEY_keygen_init(ctx) <= 0)
+    {
+        EVP_PKEY_CTX_free(ctx);
+        return false;
+    }
+
+    if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, 2048) <= 0)
+    {
+        EVP_PKEY_CTX_free(ctx);
+        return false;
+    }
+
+    EVP_PKEY* pkey = nullptr;
+    if (EVP_PKEY_keygen(ctx, &pkey) <= 0 || !pkey)
+    {
+        EVP_PKEY_CTX_free(ctx);
+        return false;
+    }
+    EVP_PKEY_CTX_free(ctx);
+
+    BIO* privBio = BIO_new(BIO_s_mem());
+    if (!privBio)
+    {
+        EVP_PKEY_free(pkey);
+        return false;
+    }
+    PEM_write_bio_PrivateKey(privBio, pkey, nullptr, nullptr, 0, nullptr, nullptr);
+    char* privData = nullptr;
+    long privLen = BIO_get_mem_data(privBio, &privData);
+    if (privData && privLen > 0)
+        outPrivateKeyPem.assign(privData, static_cast<size_t>(privLen));
+    BIO_free(privBio);
+
+    BIO* pubBio = BIO_new(BIO_s_mem());
+    if (!pubBio)
+    {
+        EVP_PKEY_free(pkey);
+        return false;
+    }
+    PEM_write_bio_PUBKEY(pubBio, pkey);
+    char* pubData = nullptr;
+    long pubLen = BIO_get_mem_data(pubBio, &pubData);
+    if (pubData && pubLen > 0)
+        outPublicKeyPem.assign(pubData, static_cast<size_t>(pubLen));
+    BIO_free(pubBio);
+
+    EVP_PKEY_free(pkey);
+    return !outPrivateKeyPem.empty() && !outPublicKeyPem.empty();
+}
+
 std::string Sign(const std::string& payload, const std::string& privateKeyPem) noexcept
 {
     if (payload.empty() || privateKeyPem.empty())
@@ -69,7 +126,14 @@ std::string Sign(const std::string& payload, const std::string& privateKeyPem) n
         return {};
     }
 
-    bool success = EVP_DigestSignInit(context, nullptr, EVP_sha256(), nullptr, key) == 1;
+    EVP_PKEY_CTX* pctx = nullptr;
+    bool success = EVP_DigestSignInit(context, &pctx, EVP_sha256(), nullptr, key) == 1;
+    if (success && pctx)
+    {
+        EVP_PKEY_CTX_set_rsa_padding(pctx, RSA_PKCS1_PSS_PADDING);
+        EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx, RSA_PSS_SALTLEN_DIGEST);
+    }
+
     if (success)
         success = EVP_DigestSignUpdate(context, payload.data(), payload.size()) == 1;
 
@@ -114,7 +178,14 @@ bool Verify(const std::string& payload,
         return false;
     }
 
-    bool success = EVP_DigestVerifyInit(context, nullptr, EVP_sha256(), nullptr, key) == 1;
+    EVP_PKEY_CTX* pctx = nullptr;
+    bool success = EVP_DigestVerifyInit(context, &pctx, EVP_sha256(), nullptr, key) == 1;
+    if (success && pctx)
+    {
+        EVP_PKEY_CTX_set_rsa_padding(pctx, RSA_PKCS1_PSS_PADDING);
+        EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx, RSA_PSS_SALTLEN_DIGEST);
+    }
+
     if (success)
         success = EVP_DigestVerifyUpdate(context, payload.data(), payload.size()) == 1;
     if (success)
@@ -128,3 +199,4 @@ bool Verify(const std::string& payload,
     return success;
 }
 }
+

@@ -9,6 +9,7 @@ class DownloadManager
 public:
     using ProgressCallback = std::function<void(long long, long long)>;
     using SpeedCallback = std::function<void(double)>;
+    using ErrorCallback = std::function<void(const std::string&)>;
 
     struct Options
     {
@@ -26,7 +27,8 @@ public:
     bool Download(const std::string& remotePath,
                   const std::string& localPath,
                   ProgressCallback progress = {},
-                  SpeedCallback speed = {}) const;
+                  SpeedCallback speed = {},
+                  ErrorCallback errorCallback = {}) const;
 
 private:
     std::string host_;

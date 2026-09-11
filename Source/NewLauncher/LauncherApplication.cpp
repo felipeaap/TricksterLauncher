@@ -76,12 +76,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
 
     launcherWindow.SetResizeCallback([](UINT width, UINT height)
     {
-        if (gui::device)
-        {
-            gui::presentParameters.BackBufferWidth = width;
-            gui::presentParameters.BackBufferHeight = height;
-            gui::ResetDevice();
-        }
+        gui::HandleResize(width, height);
     });
 
     launcherWindow.SetMoveCallback([&webView]()
@@ -104,11 +99,11 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     }
 
     gui::CreateImGui();
-    gui::LoadResources();
+    gui::LoadResources(instance);
 
     webView.Initialize(launcherWindow.Handle(), config::BaseNewsURL);
 
-    while (launcherWindow.PumpMessages())
+    while (launcherWindow.PumpMessages() && gui::IsRunning())
     {
         gui::BeginRender();
         gui::Render();

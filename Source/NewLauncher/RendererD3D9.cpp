@@ -2,13 +2,15 @@
 
 #include "imgui_impl_dx9.h"
 
-RendererD3D9::RendererD3D9(PDIRECT3D9& d3d,
-                           LPDIRECT3DDEVICE9& device,
-                           D3DPRESENT_PARAMETERS& presentParameters)
-    : d3d_(d3d)
-    , device_(device)
-    , presentParameters_(presentParameters)
+RendererD3D9::~RendererD3D9()
 {
+    Destroy();
+}
+
+void RendererD3D9::SetBackBufferSize(UINT width, UINT height) noexcept
+{
+    presentParameters_.BackBufferWidth = width;
+    presentParameters_.BackBufferHeight = height;
 }
 
 bool RendererD3D9::Create(HWND window) noexcept
