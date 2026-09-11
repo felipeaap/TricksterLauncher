@@ -66,6 +66,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     wchar_t folderPath[MAX_PATH]{};
     wcscpy_s(folderPath, exePath);
     PathRemoveFileSpecW(folderPath);
+    SetCurrentDirectoryW(folderPath);
 
     // ── Logger ──────────────────────────────────────────────────────────────
     {
