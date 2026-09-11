@@ -120,9 +120,13 @@
     <ClCompile Include="DownloadPolicyTests.cpp" />
     <ClCompile Include="ManifestSecurityTests.cpp" />
     <ClCompile Include="DownloadManagerTests.cpp" />
+    <ClCompile Include="LauncherStateTests.cpp" />
+    <ClCompile Include="ConfigTests.cpp" />
     <ClCompile Include="..\Source\NewLauncher\DownloadPolicy.cpp" />
     <ClCompile Include="..\Source\NewLauncher\ManifestSecurity.cpp" />
     <ClCompile Include="..\Source\NewLauncher\DownloadManager.cpp" />
+    <ClCompile Include="..\Source\NewLauncher\LauncherState.cpp" />
+    <ClCompile Include="..\Source\NewLauncher\Config.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

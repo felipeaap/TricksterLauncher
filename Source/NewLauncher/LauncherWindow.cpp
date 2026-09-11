@@ -1,17 +1,8 @@
 #include "LauncherWindow.h"
 
-#include "Gui.h"
 #include "imgui_impl_win32.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-namespace
-{
-constexpr int kWebViewLeft = 19;
-constexpr int kWebViewTop = 32;
-constexpr int kWebViewWidth = 503;
-constexpr int kWebViewHeight = 343;
-}
 
 LauncherWindow::~LauncherWindow()
 {
@@ -49,8 +40,8 @@ bool LauncherWindow::Create(const wchar_t* title) noexcept
         WS_POPUP,
         100,
         100,
-        gui::WIDTH,
-        gui::HEIGHT,
+        kDefaultWidth,
+        kDefaultHeight,
         nullptr,
         nullptr,
         instance_,
@@ -70,17 +61,11 @@ bool LauncherWindow::Create(const wchar_t* title) noexcept
     ShowWindow(window_, SW_SHOWDEFAULT);
     UpdateWindow(window_);
 
-    // Associate window with GUI subsystem
-    gui::SetWindow(window_);
-    gui::SetRunning(true);
-
     return true;
 }
 
 void LauncherWindow::Destroy() noexcept
 {
-    const HWND destroyedWindow = window_;
-
     if (window_)
     {
         DestroyWindow(window_);
@@ -92,9 +77,6 @@ void LauncherWindow::Destroy() noexcept
         UnregisterClassW(kWindowClassName, instance_);
         classRegistered_ = false;
     }
-
-    if (gui::GetWindow() == destroyedWindow)
-        gui::SetWindow(nullptr);
 
     instance_ = nullptr;
     running_ = false;
@@ -108,7 +90,6 @@ bool LauncherWindow::PumpMessages() noexcept
         if (message.message == WM_QUIT)
         {
             running_ = false;
-            gui::SetRunning(false);
             return false;
         }
 
@@ -116,7 +97,7 @@ bool LauncherWindow::PumpMessages() noexcept
         DispatchMessage(&message);
     }
 
-    return running_ && gui::IsRunning();
+    return running_;
 }
 
 LRESULT CALLBACK LauncherWindow::WindowProcess(
@@ -132,6 +113,8 @@ LRESULT CALLBACK LauncherWindow::WindowProcess(
     {
         const auto* createStruct = reinterpret_cast<CREATESTRUCTW*>(longParameter);
         self = static_cast<LauncherWindow*>(createStruct->lpCreateParams);
+        if (self)
+            self->window_ = window;
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
     }
 
@@ -139,12 +122,12 @@ LRESULT CALLBACK LauncherWindow::WindowProcess(
         return TRUE;
 
     if (self)
-        return self->HandleMessage(message, wideParameter, longParameter);
+        return self->HandleMessage(window, message, wideParameter, longParameter);
 
     return DefWindowProcW(window, message, wideParameter, longParameter);
 }
 
-LRESULT LauncherWindow::HandleMessage(UINT message, WPARAM wideParameter, LPARAM longParameter) noexcept
+LRESULT LauncherWindow::HandleMessage(HWND window, UINT message, WPARAM wideParameter, LPARAM longParameter) noexcept
 {
     switch (message)
     {
@@ -165,7 +148,6 @@ LRESULT LauncherWindow::HandleMessage(UINT message, WPARAM wideParameter, LPARAM
 
     case WM_DESTROY:
         running_ = false;
-        gui::SetRunning(false);
         PostQuitMessage(0);
         return 0;
 
@@ -178,15 +160,15 @@ LRESULT LauncherWindow::HandleMessage(UINT message, WPARAM wideParameter, LPARAM
         {
             const POINTS points = MAKEPOINTS(longParameter);
             RECT rect{};
-            GetWindowRect(window_, &rect);
+            GetWindowRect(window, &rect);
             rect.left += points.x - dragOrigin_.x;
             rect.top += points.y - dragOrigin_.y;
 
-            if (dragOrigin_.x >= 0 && dragOrigin_.x <= gui::WIDTH &&
+            if (dragOrigin_.x >= 0 && dragOrigin_.x <= kDefaultWidth &&
                 dragOrigin_.y >= 0 && dragOrigin_.y <= 19)
             {
                 SetWindowPos(
-                    window_,
+                    window,
                     HWND_TOPMOST,
                     rect.left,
                     rect.top,
@@ -198,5 +180,5 @@ LRESULT LauncherWindow::HandleMessage(UINT message, WPARAM wideParameter, LPARAM
         return 0;
     }
 
-    return DefWindowProcW(window_, message, wideParameter, longParameter);
+    return DefWindowProcW(window, message, wideParameter, longParameter);
 }

@@ -20,14 +20,19 @@ public:
     void Destroy() noexcept;
     bool PumpMessages() noexcept;
 
+    static constexpr int kDefaultWidth = 538;
+    static constexpr int kDefaultHeight = 564;
+
     HWND Handle() const noexcept { return window_; }
+    bool IsRunning() const noexcept { return running_; }
+    void SetRunning(bool running) noexcept { running_ = running; }
 
     void SetResizeCallback(ResizeCallback callback) { resizeCallback_ = std::move(callback); }
     void SetMoveCallback(MoveCallback callback) { moveCallback_ = std::move(callback); }
 
 private:
     static LRESULT CALLBACK WindowProcess(HWND window, UINT message, WPARAM wideParameter, LPARAM longParameter);
-    LRESULT HandleMessage(UINT message, WPARAM wideParameter, LPARAM longParameter) noexcept;
+    LRESULT HandleMessage(HWND window, UINT message, WPARAM wideParameter, LPARAM longParameter) noexcept;
 
     HWND window_ = nullptr;
     HINSTANCE instance_ = nullptr;

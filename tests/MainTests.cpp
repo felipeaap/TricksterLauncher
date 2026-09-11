@@ -3,6 +3,8 @@
 void RunDownloadPolicyTests();
 void RunManifestSecurityTests();
 void RunDownloadManagerTests();
+void RunLauncherStateTests();
+void RunConfigTests();
 
 int main()
 {
@@ -15,9 +17,11 @@ int main()
         RunDownloadPolicyTests();
         RunManifestSecurityTests();
         RunDownloadManagerTests();
+        RunLauncherStateTests();
+        RunConfigTests();
 
         std::cout << "========================================" << std::endl;
-        std::cout << " ALL TESTS PASSED SUCCESSFULLY! (3/3 suites)" << std::endl;
+        std::cout << " ALL TESTS PASSED SUCCESSFULLY! (5/5 suites)" << std::endl;
         std::cout << "========================================" << std::endl;
         return 0;
     }

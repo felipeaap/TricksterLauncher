@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <d3d9.h>
+#include <functional>
 
 class RendererD3D9
 {
@@ -21,15 +22,23 @@ public:
 
     void SetBackBufferSize(UINT width, UINT height) noexcept;
 
+    /// Register callbacks invoked during Reset() to manage D3DPOOL_DEFAULT resources.
+    /// @param onBeforeReset  Called before ImGui/device objects are invalidated.
+    /// @param onAfterReset   Called after ImGui/device objects are recreated.
+    void SetDeviceResetCallbacks(
+        std::function<void()> onBeforeReset,
+        std::function<void()> onAfterReset) noexcept;
+
     [[nodiscard]] LPDIRECT3DDEVICE9 Device() const noexcept { return device_; }
     [[nodiscard]] PDIRECT3D9 D3D() const noexcept { return d3d_; }
     [[nodiscard]] const D3DPRESENT_PARAMETERS& PresentParameters() const noexcept { return presentParameters_; }
     [[nodiscard]] D3DPRESENT_PARAMETERS& PresentParameters() noexcept { return presentParameters_; }
 
 private:
-    PDIRECT3D9 d3d_ = nullptr;
-    LPDIRECT3DDEVICE9 device_ = nullptr;
+    PDIRECT3D9            d3d_                = nullptr;
+    LPDIRECT3DDEVICE9     device_             = nullptr;
     D3DPRESENT_PARAMETERS presentParameters_{};
-    bool sceneBegun_ = false;
+    bool                  sceneBegun_         = false;
+    std::function<void()> onBeforeReset_;
+    std::function<void()> onAfterReset_;
 };
-

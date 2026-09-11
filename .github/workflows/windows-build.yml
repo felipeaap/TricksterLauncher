@@ -1,4 +1,4 @@
-name: Windows build
+name: Windows Build & Test
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-test:
     runs-on: windows-2022
 
     steps:
@@ -21,11 +21,27 @@ jobs:
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v2
 
-      - name: Restore packages
+      - name: Restore NuGet packages
         run: nuget restore "Trickster Launcher.sln"
 
       - name: Build Release Win32
-        run: msbuild "Trickster Launcher.sln" /m /p:Configuration=Release /p:Platform=Win32 /p:RestorePackagesConfig=true
+        run: |
+          msbuild "Trickster Launcher.sln" `
+            /m `
+            /p:Configuration=Release `
+            /p:Platform=Win32 `
+            /p:RestorePackagesConfig=true
+
+      - name: Run Unit Tests
+        run: |
+          Write-Host "Running TricksterLauncherTests..."
+          $result = & "Output\Tests\TricksterLauncherTests.exe"
+          Write-Host $result
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Unit tests FAILED with exit code $LASTEXITCODE"
+            exit 1
+          }
+          Write-Host "All tests passed."
 
       - name: Upload Launcher binaries
         if: success()
@@ -45,3 +61,11 @@ jobs:
           name: filelistgen-release
           path: Output/FileListGen/FileListGen.exe
           retention-days: 30
+
+      - name: Upload Test Binary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: Output/Tests/TricksterLauncherTests.exe
+          retention-days: 7

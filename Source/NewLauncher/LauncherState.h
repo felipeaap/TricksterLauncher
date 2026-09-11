@@ -4,8 +4,20 @@
 #include <mutex>
 #include <string>
 
-/// Shared launcher state written by worker threads and read by the render thread.
-/// Replaces the global variables previously exposed in the gui:: namespace.
+/// Snapshot of the state passed directly to the view for rendering.
+struct LauncherViewState
+{
+    float fileProgress = 0.0f;
+    float totalProgress = 0.0f;
+    std::string fileString;
+    std::string speedString;
+    bool isGameEnabled = false;
+    bool isCheckEnabled = false;
+    bool isOptionEnabled = false;
+    bool isMaintenance = false;
+};
+
+/// Shared launcher state written by worker/presenter threads and read by the render thread.
 namespace LauncherState
 {
     /// Per-file verification/download progress [0.0, 1.0].
@@ -25,4 +37,20 @@ namespace LauncherState
 
     /// Human-readable download speed string, e.g. "1.2 MB/s".
     extern std::string speedString;
+
+    /// Button enabled states
+    extern std::atomic<bool> isGameEnabled;
+    extern std::atomic<bool> isCheckEnabled;
+    extern std::atomic<bool> isOptionEnabled;
+    extern std::atomic<bool> isMaintenance;
+
+    /// Obtains a consistent snapshot for the view layer.
+    LauncherViewState GetSnapshot();
+
+    /// Convenience helpers
+    void SetProgress(float fileProg, float totalProg);
+    void SetStatus(const std::string& status);
+    void SetSpeed(const std::string& speed);
+    void SetButtons(bool game, bool check, bool option);
+    void SetMaintenance(bool maintenance);
 }
