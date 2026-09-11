@@ -61,4 +61,6 @@ private:
     bool shouldClose_ = false;
     ImFont* fontSmall_ = nullptr;
     ImFont* fontRegular_ = nullptr;
+    float animFileProgress_ = 0.0f;
+    float animTotalProgress_ = 0.0f;
 };

@@ -112,19 +112,19 @@ void LauncherView::RenderBeveledProgressBar(
     ImVec2 p1 = ImVec2(p0.x + size.x, p0.y + size.y);
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
-    // 1. Inset background track (outer subtle shadow + sunken slot)
-    dl->AddRectFilled(ImVec2(p0.x - 1.0f, p0.y - 1.0f), ImVec2(p1.x + 1.0f, p1.y + 1.0f), IM_COL32(0, 0, 0, 80), rounding + 1.0f);
-    dl->AddRectFilled(p0, p1, IM_COL32(12, 18, 28, 235), rounding);
+    // 1. Inset background track (soft outer shadow + sunken slot)
+    dl->AddRectFilled(ImVec2(p0.x - 1.0f, p0.y - 1.0f), ImVec2(p1.x + 1.0f, p1.y + 1.0f), IM_COL32(0, 0, 0, 60), rounding + 1.0f);
+    dl->AddRectFilled(p0, p1, IM_COL32(10, 15, 24, 230), rounding);
 
-    // Upper inner shadow to give sunken depth
+    // Soft upper inner shadow for depth
     const float halfTrackH = size.y * 0.45f;
-    dl->AddRectFilled(p0, ImVec2(p1.x, p0.y + halfTrackH), IM_COL32(0, 0, 0, 75), rounding, ImDrawFlags_RoundCornersTop);
+    dl->AddRectFilled(p0, ImVec2(p1.x, p0.y + halfTrackH), IM_COL32(0, 0, 0, 60), rounding, ImDrawFlags_RoundCornersTop);
 
-    // Track border
-    dl->AddRect(p0, p1, IM_COL32(32, 45, 65, 220), rounding, 0, 1.0f);
+    // Subtle track border
+    dl->AddRect(p0, p1, IM_COL32(35, 50, 72, 175), rounding, 0, 1.0f);
 
-    // Bottom 3D groove highlight
-    dl->AddLine(ImVec2(p0.x + rounding, p1.y + 0.5f), ImVec2(p1.x - rounding, p1.y + 0.5f), IM_COL32(255, 255, 255, 30), 1.0f);
+    // Subtle bottom 3D groove highlight
+    dl->AddLine(ImVec2(p0.x + rounding, p1.y + 0.5f), ImVec2(p1.x - rounding, p1.y + 0.5f), IM_COL32(255, 255, 255, 24), 1.0f);
 
     // 2. Filled progress bar
     const float f = (std::clamp)(fraction, 0.0f, 1.0f);
@@ -140,17 +140,51 @@ void LauncherView::RenderBeveledProgressBar(
         const float barRounding = (std::min)(rounding - 0.5f, barW * 0.5f);
         const ImDrawFlags cornerFlags = (barW >= maxBarW - 1.0f) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersLeft;
 
-        // Base fill (bottom tone / depth)
+        // Base fill (smooth rich tone)
         dl->AddRectFilled(barP0, barP1, colBottom, barRounding, cornerFlags);
 
-        // Top half bevel (gloss / highlight dome)
-        const float splitY = barP0.y + barH * 0.48f;
+        // Soft layered bevel gloss dome (smooth multi-layer gradient without harsh lines)
         const ImDrawFlags topCornerFlags = (cornerFlags & ImDrawFlags_RoundCornersLeft)
             ? (ImDrawFlags_RoundCornersTopLeft | (barW >= maxBarW - 1.0f ? ImDrawFlags_RoundCornersTopRight : 0))
             : ImDrawFlags_None;
-        dl->AddRectFilled(barP0, ImVec2(barP1.x, splitY), colTop, barRounding, topCornerFlags);
 
-        // Top specular line (crisp light reflection)
+        // Layer 1: Broad soft upper sheen
+        dl->AddRectFilled(barP0, ImVec2(barP1.x, barP0.y + barH * 0.52f), colTop, barRounding, topCornerFlags);
+
+        // Layer 2: Subtle top-quarter highlight for rounded dome curve
+        ImU32 colTopCrest = (colTop & 0x00FFFFFF) | (static_cast<ImU32>((colTop >> 24) * 0.7f) << 24);
+        dl->AddRectFilled(barP0, ImVec2(barP1.x, barP0.y + barH * 0.28f), colTopCrest, barRounding, topCornerFlags);
+
+        // Animated soft wave shimmer gliding across the bar
+        const float t = static_cast<float>(ImGui::GetTime());
+        const float shimmerPhase = fmodf(t * 0.65f, 2.0f) - 0.5f;
+        const float shimmerCenter = barP0.x + maxBarW * shimmerPhase;
+        const float shimmerWidth = 32.0f;
+        const float sMinX = (std::max)(barP0.x, shimmerCenter - shimmerWidth * 0.5f);
+        const float sMaxX = (std::min)(barP1.x, shimmerCenter + shimmerWidth * 0.5f);
+        if (sMaxX > sMinX)
+        {
+            dl->AddRectFilled(
+                ImVec2(sMinX, barP0.y),
+                ImVec2(sMaxX, barP1.y),
+                IM_COL32(255, 255, 255, 28),
+                barRounding,
+                topCornerFlags);
+        }
+
+        // Soft pulse on the leading tip when progressing
+        if (f > 0.02f && f < 0.999f)
+        {
+            const float pulseAlpha = (sinf(t * 5.0f) * 0.5f + 0.5f) * 35.0f + 15.0f;
+            dl->AddRectFilled(
+                ImVec2(barP1.x - 2.5f, barP0.y),
+                barP1,
+                IM_COL32(255, 255, 255, static_cast<int>(pulseAlpha)),
+                barRounding,
+                cornerFlags);
+        }
+
+        // Soft specular top highlight line
         const float startX = barP0.x + ((topCornerFlags & ImDrawFlags_RoundCornersTopLeft) ? barRounding : 1.0f);
         const float endX = barP1.x - ((topCornerFlags & ImDrawFlags_RoundCornersTopRight) ? barRounding : 1.0f);
         if (endX > startX)
@@ -158,7 +192,7 @@ void LauncherView::RenderBeveledProgressBar(
             dl->AddLine(ImVec2(startX, barP0.y + 0.5f), ImVec2(endX, barP0.y + 0.5f), colHighlight, 1.0f);
         }
 
-        // Bottom bevel shadow line
+        // Soft bottom bevel shadow line
         const float shadowStartX = barP0.x + ((cornerFlags & ImDrawFlags_RoundCornersBottomLeft) ? barRounding : 1.0f);
         const float shadowEndX = barP1.x - 1.0f;
         if (shadowEndX > shadowStartX)
@@ -166,7 +200,7 @@ void LauncherView::RenderBeveledProgressBar(
             dl->AddLine(ImVec2(shadowStartX, barP1.y - 0.5f), ImVec2(shadowEndX, barP1.y - 0.5f), colShadow, 1.0f);
         }
 
-        // Fill border
+        // Soft fill border
         dl->AddRect(barP0, barP1, colBorder, barRounding, cornerFlags, 1.0f);
     }
 
@@ -182,6 +216,21 @@ void LauncherView::Render(
     ImGuiIO& io = ImGui::GetIO();
     ImGui::SetNextWindowPos({ 0, 0 });
     ImGui::SetNextWindowSize({ static_cast<float>(kWidth), static_cast<float>(kHeight) });
+
+    // Smooth animated interpolation towards target progress values
+    float dt = io.DeltaTime;
+    if (dt <= 0.0f) dt = 1.0f / 60.0f;
+    if (dt > 0.1f) dt = 0.1f;
+
+    const float lerpSpeed = 14.0f;
+    const float lerpFactor = 1.0f - expf(-lerpSpeed * dt);
+    animFileProgress_ += (state.fileProgress - animFileProgress_) * lerpFactor;
+    animTotalProgress_ += (state.totalProgress - animTotalProgress_) * lerpFactor;
+
+    if (fabsf(animFileProgress_ - state.fileProgress) < 0.0005f)
+        animFileProgress_ = state.fileProgress;
+    if (fabsf(animTotalProgress_ - state.totalProgress) < 0.0005f)
+        animTotalProgress_ = state.totalProgress;
 
     bool showWindow = true;
     bool opened = ImGui::Begin(
@@ -215,28 +264,28 @@ void LauncherView::Render(
                 ImVec2(185, 71));
         }
 
-        // Progress bar 1: File progress (Ice Silver Bevel)
+        // Progress bar 1: File progress (Soft Ice Silver Bevel with smooth animation)
         ImGui::SetCursorPos(ImVec2(24, winSize.y - 166));
         RenderBeveledProgressBar(
-            state.fileProgress,
+            animFileProgress_,
             ImVec2(362, 8),
-            IM_COL32(255, 255, 255, 245),
-            IM_COL32(175, 200, 230, 255),
-            IM_COL32(255, 255, 255, 255),
-            IM_COL32(110, 140, 175, 220),
-            IM_COL32(65, 95, 135, 200),
+            IM_COL32(255, 255, 255, 130),
+            IM_COL32(185, 205, 230, 255),
+            IM_COL32(255, 255, 255, 180),
+            IM_COL32(100, 130, 165, 140),
+            IM_COL32(50, 75, 110, 150),
             3.5f);
 
-        // Progress bar 2: Total progress (Vibrant Aqua Crystal Bevel)
+        // Progress bar 2: Total progress (Soft Vibrant Aqua Crystal Bevel with smooth animation)
         ImGui::SetCursorPos(ImVec2(24, winSize.y - 154));
         RenderBeveledProgressBar(
-            state.totalProgress,
+            animTotalProgress_,
             ImVec2(362, 14),
-            IM_COL32(165, 248, 255, 255),
-            IM_COL32(18, 145, 215, 255),
-            IM_COL32(255, 255, 255, 245),
-            IM_COL32(8, 85, 140, 230),
-            IM_COL32(10, 85, 140, 220),
+            IM_COL32(170, 245, 255, 150),
+            IM_COL32(22, 150, 218, 255),
+            IM_COL32(255, 255, 255, 190),
+            IM_COL32(8, 80, 135, 150),
+            IM_COL32(10, 75, 125, 160),
             4.0f);
 
         // Status text & download speed
