@@ -210,6 +210,7 @@ bool LauncherView::ModernButton(
                 p0.y + (size.y - textSize.y) * 0.5f);
             dl->AddText(textPos, lockedCol, label);
         }
+    }
     else
     {
         // ── Floating Clean Pill Buttons (Matching Trickster Classic Theme) ──
