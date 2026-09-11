@@ -74,6 +74,7 @@ private:
     ImFont* fontSmall_ = nullptr;
     ImFont* fontRegular_ = nullptr;
     ImFont* fontBold_ = nullptr;
+    ImFont* fontLarge_ = nullptr;
     float animFileProgress_ = 0.0f;
     float animTotalProgress_ = 0.0f;
 };

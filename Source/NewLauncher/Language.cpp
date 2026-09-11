@@ -12,6 +12,7 @@ namespace lang
         {"launcher_options",             "OPTION"},
         {"launcher_exit",                "EXIT"},
         {"launcher_verify",              "CHECK FILES"},
+        {"launcher_check",               "CHECK FILES"},
         {"launcher_site_desc",           "You can visit our website by"},
         {"launcher_site_click",          "CLICKING HERE"},
         {"launcher_update_launch_fail",  "Failed to launch the updated launcher."},

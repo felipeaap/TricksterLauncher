@@ -7,7 +7,7 @@
 
 namespace
 {
-constexpr RECT kDefaultBounds{19, 32, 19 + 503, 32 + 343};
+constexpr RECT kDefaultBounds{ 19, 42, 19 + 501, 42 + 332 };
 }
 
 LauncherWebView::~LauncherWebView()

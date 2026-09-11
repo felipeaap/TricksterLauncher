@@ -57,6 +57,13 @@ bool LauncherWindow::Create(const wchar_t* title) noexcept
         return false;
     }
 
+    // Apply smooth rounded window corners
+    HRGN windowRgn = CreateRoundRectRgn(0, 0, kDefaultWidth + 1, kDefaultHeight + 1, 16, 16);
+    if (windowRgn)
+    {
+        SetWindowRgn(window_, windowRgn, TRUE);
+    }
+
     running_ = true;
     ShowWindow(window_, SW_SHOWDEFAULT);
     UpdateWindow(window_);
