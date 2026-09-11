@@ -31,7 +31,8 @@ EndpointManager::EndpointManager(std::vector<std::string> hosts,
 
 std::string EndpointManager::Get(const std::string& path) const
 {
-    for (const auto& host : hosts_)
+    const auto rankedHosts = download_telemetry::GetRankedHosts(hosts_);
+    for (const auto& host : rankedHosts)
     {
         if (host.empty())
             continue;
@@ -51,15 +52,11 @@ bool EndpointManager::Download(const std::string& remotePath,
                                DownloadManager::SpeedCallback speed,
                                const std::string& expectedHash) const
 {
-    bool attempted = false;
-    for (const auto& host : hosts_)
+    const auto rankedHosts = download_telemetry::GetRankedHosts(hosts_);
+    for (const auto& host : rankedHosts)
     {
         if (host.empty())
             continue;
-
-        if (attempted)
-            RemovePartialDownloadState(localPath);
-        attempted = true;
 
         const auto started = std::chrono::steady_clock::now();
         DownloadManager manager(host, useSsl_, options_);

@@ -18,6 +18,8 @@ namespace config
     // Signed consolidated manifest migration.
     extern bool ManifestRequireSignature;
     extern std::string ManifestPublicKeyPem;
+    // Certificate & Public-Key pinning for HTTPS
+    extern std::vector<std::string> PinnedCertificateHashes;
 
     /// Load settings from config.json located in the given directory.
     /// If the file does not exist or cannot be parsed, compiled-in defaults are preserved.

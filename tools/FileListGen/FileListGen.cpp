@@ -302,7 +302,8 @@ void salvarVersaoLegada(const std::string& pastaVersion,
 
 bool salvarManifesto(const std::vector<Arquivo>& arquivos,
                      int versao,
-                     const std::string& privateKeyPath)
+                     const std::string& privateKeyPath,
+                     const std::string& manifestOutputPath)
 {
     json document;
     document["version"] = versao;
@@ -324,7 +325,10 @@ bool salvarManifesto(const std::vector<Arquivo>& arquivos,
     {
         std::ifstream keyFile(privateKeyPath, std::ios::binary);
         if (!keyFile)
+        {
+            std::cerr << "[ERROR] Could not open private key file: " << privateKeyPath << std::endl;
             return false;
+        }
 
         std::stringstream keyBuffer;
         keyBuffer << keyFile.rdbuf();
@@ -339,11 +343,15 @@ bool salvarManifesto(const std::vector<Arquivo>& arquivos,
             {"algorithm", "SHA256"},
             {"value", signature}
         };
+        std::cout << "[INFO] Manifest successfully signed." << std::endl;
     }
 
-    std::ofstream output("manifest.json", std::ios::binary);
+    std::ofstream output(manifestOutputPath, std::ios::binary);
     if (!output)
+    {
+        std::cerr << "[ERROR] Could not create output manifest: " << manifestOutputPath << std::endl;
         return false;
+    }
 
     output << document.dump(4);
     return output.good();
@@ -357,16 +365,101 @@ void salvarLauncherHash(const std::string& caminhoSplash)
         outLauncher << hash;
 }
 
+void PrintHelp()
+{
+    std::cout << "FileListGen - Manifest Generator & Signing Tool for TricksterLauncher\n\n"
+              << "Usage: FileListGen.exe [options]\n\n"
+              << "Options:\n"
+              << "  -s, --sign <key_path>       Sign manifest with RSA private key (PEM format)\n"
+              << "  -g, --genkey <dir>          Generate a new RSA-PSS 3072 key pair and exit\n"
+              << "  -m, --mode <parallel|seq>   Execution mode for SHA256 hashing (default: parallel)\n"
+              << "  -u, --update-dir <path>     Directory to index (default: Update)\n"
+              << "  -v, --version-dir <path>    Version history directory (default: version)\n"
+              << "  -o, --output <path>         Output manifest file path (default: manifest.json)\n"
+              << "  -h, --help                  Show this help message\n";
+}
+
 int main(int argc, char* argv[])
 {
     ExecMode modo = ExecMode::Parallel;
-    if (argc > 1 && std::string(argv[1]) == "sequential")
-        modo = ExecMode::Sequential;
+    std::string privateKeyPath;
+    std::string genKeyDir;
+    std::string updateDir = "Update";
+    std::string versionDir = "version";
+    std::string manifestOutput = "manifest.json";
 
-    const std::string privateKeyPath = argc > 2 ? argv[2] : std::string{};
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string arg = argv[i];
+        if (arg == "-h" || arg == "--help" || arg == "/?")
+        {
+            PrintHelp();
+            return 0;
+        }
+        else if ((arg == "-s" || arg == "--sign") && i + 1 < argc)
+        {
+            privateKeyPath = argv[++i];
+        }
+        else if ((arg == "-g" || arg == "--genkey") && i + 1 < argc)
+        {
+            genKeyDir = argv[++i];
+        }
+        else if ((arg == "-m" || arg == "--mode") && i + 1 < argc)
+        {
+            std::string val = argv[++i];
+            if (val == "sequential" || val == "seq")
+                modo = ExecMode::Sequential;
+            else
+                modo = ExecMode::Parallel;
+        }
+        else if ((arg == "-u" || arg == "--update-dir") && i + 1 < argc)
+        {
+            updateDir = argv[++i];
+        }
+        else if ((arg == "-v" || arg == "--version-dir") && i + 1 < argc)
+        {
+            versionDir = argv[++i];
+        }
+        else if ((arg == "-o" || arg == "--output") && i + 1 < argc)
+        {
+            manifestOutput = argv[++i];
+        }
+        else if (arg == "sequential")
+        {
+            modo = ExecMode::Sequential;
+        }
+        else if (privateKeyPath.empty() && arg.find(".pem") != std::string::npos)
+        {
+            privateKeyPath = arg;
+        }
+    }
 
-    const auto antigos = carregarArquivosAntigos("version");
-    const auto novos = gerarListaArquivos("Update", modo);
+    if (!genKeyDir.empty())
+    {
+        std::cout << "[INFO] Generating RSA 3072 key pair in: " << genKeyDir << std::endl;
+        std::string priv, pub;
+        if (!manifest_security::GenerateKeyPair(priv, pub))
+        {
+            std::cerr << "[ERROR] Key pair generation failed." << std::endl;
+            return 1;
+        }
+
+        CreateDirectoryA(genKeyDir.c_str(), nullptr);
+        std::ofstream privFile(genKeyDir + "\\private_key.pem", std::ios::binary);
+        std::ofstream pubFile(genKeyDir + "\\public_key.pem", std::ios::binary);
+        if (!privFile || !pubFile)
+        {
+            std::cerr << "[ERROR] Could not write key files to: " << genKeyDir << std::endl;
+            return 1;
+        }
+        privFile << priv;
+        pubFile << pub;
+        std::cout << "[SUCCESS] Generated private_key.pem and public_key.pem in " << genKeyDir << std::endl;
+        return 0;
+    }
+
+    const auto antigos = carregarArquivosAntigos(versionDir);
+    const auto novos = gerarListaArquivos(updateDir, modo);
 
     std::vector<Arquivo> alterados;
     for (const auto& novo : novos)
@@ -377,13 +470,14 @@ int main(int argc, char* argv[])
             alterados.push_back(novo);
     }
 
-    const int versao = proximaVersao("version");
+    const int versao = proximaVersao(versionDir);
     if (!alterados.empty())
-        salvarVersaoLegada("version", versao, alterados);
+        salvarVersaoLegada(versionDir, versao, alterados);
 
-    if (!salvarManifesto(novos, versao, privateKeyPath))
+    if (!salvarManifesto(novos, versao, privateKeyPath, manifestOutput))
         return 1;
 
-    salvarLauncherHash("Update\\Splash.exe");
+    salvarLauncherHash(updateDir + "\\Splash.exe");
+    std::cout << "[SUCCESS] Manifest generated (version " << versao << ", " << novos.size() << " files)." << std::endl;
     return 0;
 }

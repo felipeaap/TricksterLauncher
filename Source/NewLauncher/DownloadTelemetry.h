@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 struct DownloadTelemetryRecord
 {
@@ -16,4 +17,7 @@ struct DownloadTelemetryRecord
 namespace download_telemetry
 {
     void Record(const DownloadTelemetryRecord& record) noexcept;
+    std::vector<std::string> GetRankedHosts(const std::vector<std::string>& hosts) noexcept;
+    double GetHostThroughput(const std::string& host) noexcept;
+    void ResetHostMetrics() noexcept;
 }

@@ -3,6 +3,7 @@ name: Windows Build & Test
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -24,12 +25,12 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore "Trickster Launcher.sln"
 
-      - name: Build Release Win32
+      - name: Build Solution (Release x86)
         run: |
           msbuild "Trickster Launcher.sln" `
             /m `
             /p:Configuration=Release `
-            /p:Platform=Win32 `
+            /p:Platform=x86 `
             /p:RestorePackagesConfig=true
 
       - name: Run Unit Tests
@@ -43,29 +44,53 @@ jobs:
           }
           Write-Host "All tests passed."
 
-      - name: Upload Launcher binaries
+      - name: Package Release Artifacts
+        if: success()
+        run: |
+          New-Item -ItemType Directory -Force -Path "Output\ReleasePackage" | Out-Null
+          Copy-Item "Output\Trickster Launcher\Splash.exe" "Output\ReleasePackage\"
+          Copy-Item "Output\Trickster Launcher\LauncherUpdater.exe" "Output\ReleasePackage\"
+          Copy-Item "Output\Trickster Launcher\WebView2Loader.dll" "Output\ReleasePackage\"
+          Copy-Item "config.example.json" "Output\ReleasePackage\"
+          
+          Compress-Archive -Path "Output\ReleasePackage\*" -DestinationPath "Output\TricksterLauncher-win32.zip" -Force
+          Compress-Archive -Path "Output\FileListGen\FileListGen.exe" -DestinationPath "Output\FileListGen-win32.zip" -Force
+
+          Get-FileHash -Algorithm SHA256 "Output\TricksterLauncher-win32.zip", "Output\FileListGen-win32.zip" |
+            ForEach-Object { "$($_.Hash)  $([System.IO.Path]::GetFileName($_.Path))" } |
+            Set-Content "Output\SHA256SUMS.txt"
+
+      - name: Upload Launcher Zip
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: trickster-launcher-release
-          path: |
-            Output/Trickster Launcher/Splash.exe
-            Output/Trickster Launcher/LauncherUpdater.exe
-            Output/Trickster Launcher/WebView2Loader.dll
+          name: TricksterLauncher-win32
+          path: Output/TricksterLauncher-win32.zip
           retention-days: 30
 
-      - name: Upload FileListGen
+      - name: Upload FileListGen Zip
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: filelistgen-release
-          path: Output/FileListGen/FileListGen.exe
+          name: FileListGen-win32
+          path: Output/FileListGen-win32.zip
           retention-days: 30
 
-      - name: Upload Test Binary
-        if: always()
+      - name: Upload Checksums
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: Output/Tests/TricksterLauncherTests.exe
-          retention-days: 7
+          name: SHA256SUMS
+          path: Output/SHA256SUMS.txt
+          retention-days: 30
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Output/TricksterLauncher-win32.zip
+            Output/FileListGen-win32.zip
+            Output/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

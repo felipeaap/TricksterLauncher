@@ -85,5 +85,18 @@ void RunConfigTests()
         RemoveTempConfig();
     }
 
+    // ── Test 5: Pinned cert hashes parsing ─────────────────────────────────
+    {
+        const char* json = R"({
+            "pinned_cert_hashes": ["a1b2c3d4e5f6", "112233445566"]
+        })";
+        const std::wstring dir = WriteTempConfig(json);
+        config::Load(dir);
+        assert(config::PinnedCertificateHashes.size() == 2);
+        assert(config::PinnedCertificateHashes[0] == "a1b2c3d4e5f6");
+        assert(config::PinnedCertificateHashes[1] == "112233445566");
+        RemoveTempConfig();
+    }
+
     std::cout << "[PASS] Config tests passed!" << std::endl;
 }

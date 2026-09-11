@@ -19,6 +19,7 @@ namespace config
     std::string InjectDLLName           = "Trickster.dll";
     bool ManifestRequireSignature       = false;
     std::string ManifestPublicKeyPem    = {};
+    std::vector<std::string> PinnedCertificateHashes = {};
 
     void Load(const std::wstring& exeDir) noexcept
     {
@@ -68,6 +69,14 @@ namespace config
             getString ("dll_name",      InjectDLLName);
             getBool   ("manifest_require_signature", ManifestRequireSignature);
             getString ("manifest_public_key_pem",    ManifestPublicKeyPem);
+
+            if (j.contains("pinned_cert_hashes") && j["pinned_cert_hashes"].is_array())
+            {
+                PinnedCertificateHashes.clear();
+                for (const auto& item : j["pinned_cert_hashes"])
+                    if (item.is_string())
+                        PinnedCertificateHashes.push_back(item.get<std::string>());
+            }
 
             if (j.contains("cdn_backups") && j["cdn_backups"].is_array())
             {

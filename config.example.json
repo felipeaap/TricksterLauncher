@@ -1,0 +1,18 @@
+{
+  "window_title": "Trickster Online",
+  "subtitle": "Game Launcher",
+  "cdn": "patch.example.com",
+  "cdn_backups": [
+    "patch-mirror1.example.com",
+    "patch-mirror2.example.com"
+  ],
+  "use_ssl": true,
+  "news_url": "https://patch.example.com/news.html",
+  "website_link": "https://example.com",
+  "option_exec": "Setup.exe",
+  "dll_inject": false,
+  "dll_name": "Trickster.dll",
+  "manifest_require_signature": true,
+  "manifest_public_key_pem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+  "pinned_cert_hashes": []
+}
