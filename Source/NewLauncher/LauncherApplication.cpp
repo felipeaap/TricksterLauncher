@@ -83,7 +83,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     // ── Admin check ─────────────────────────────────────────────────────────
     if (RequiresAdmin(folderPath))
     {
-        Logger::Log("RequiresAdmin -> RelaunchAsAdmin");
+        Logger::LogError("RequiresAdmin=true -> RelaunchAsAdmin");
         RelaunchAsAdmin(exePath);
         Logger::Shutdown();
         return EXIT_SUCCESS;

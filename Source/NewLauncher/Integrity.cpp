@@ -24,7 +24,7 @@ std::string DigestFile(const std::string& filePath, const EVP_MD* algorithm) noe
 
     unsigned char digest[EVP_MAX_MD_SIZE]{};
     unsigned int digestLength = 0;
-    std::array<char, 1024 * 1024> buffer{};
+    std::array<char, 65536> buffer{};  // 64KB — good I/O throughput without blowing the thread stack
     bool success = EVP_DigestInit_ex(context, algorithm, nullptr) == 1;
 
     while (success && file.good())
