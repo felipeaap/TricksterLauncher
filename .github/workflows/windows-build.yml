@@ -1,0 +1,28 @@
+name: Windows build
+
+on:
+  push:
+    branches: [ main, chore/phase-1-repository-cleanup ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore packages
+        run: nuget restore "Trickster Launcher.sln"
+
+      - name: Build Release Win32
+        run: msbuild "Trickster Launcher.sln" /m /p:Configuration=Release /p:Platform=Win32 /p:RestorePackagesConfig=true

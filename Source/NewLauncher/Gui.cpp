@@ -9,6 +9,7 @@
 #include "Helper.h"
 #include "Language.h"
 #include "Config.h"
+#include "RendererD3D9.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include <imgui_internal.h>
@@ -45,6 +46,7 @@ namespace gui
 	D3DPRESENT_PARAMETERS presentParameters = {};
 	wil::com_ptr<ICoreWebView2Controller> g_controller = nullptr;
 	wil::com_ptr<ICoreWebView2> g_webview = nullptr;
+	RendererD3D9 renderer(d3d, device, presentParameters);
 }
 
 long __stdcall WindowProcess( HWND window, UINT message, WPARAM wideParameter, LPARAM longParameter )
@@ -238,42 +240,17 @@ void gui::DestroyHWindow() noexcept
 
 bool gui::CreateDevice() noexcept
 {
-	d3d = Direct3DCreate9( D3D_SDK_VERSION) ;
-	if ( !d3d )
-		return false;
-	ZeroMemory( &presentParameters, sizeof( presentParameters ) );
-	presentParameters.Windowed = TRUE;
-	presentParameters.SwapEffect = D3DSWAPEFFECT_DISCARD;
-	presentParameters.BackBufferFormat = D3DFMT_UNKNOWN;
-	presentParameters.EnableAutoDepthStencil = TRUE;
-	presentParameters.AutoDepthStencilFormat = D3DFMT_D16;
-	presentParameters.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
-	if ( d3d->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, window, D3DCREATE_HARDWARE_VERTEXPROCESSING, &presentParameters, &device ) < 0 )
-		return false;
-	return true;
+	return renderer.Create(window);
 }
 
 void gui::ResetDevice() noexcept
 {
-	ImGui_ImplDX9_InvalidateDeviceObjects();
-	const auto result = device->Reset( &presentParameters );
-	if ( result == D3DERR_INVALIDCALL )
-		IM_ASSERT( 0 );
-	ImGui_ImplDX9_CreateDeviceObjects();
+	renderer.Reset();
 }
 
 void gui::DestroyDevice() noexcept
 {
-	if ( device )
-	{
-		device->Release();
-		device = nullptr;
-	}
-	if ( d3d )
-	{
-		d3d->Release();
-		d3d = nullptr;
-	}
+	renderer.Destroy();
 }
 
 void gui::SetupImGuiStyle() noexcept
@@ -382,8 +359,7 @@ void gui::CreateImGui() noexcept
 
 void gui::CleanupDeviceD3D() noexcept
 {
-	if (device) { device->Release(); device = NULL; }
-	if (d3d) { d3d->Release(); d3d = NULL; }
+	renderer.Destroy();
 }
 
 void gui::DestroyImGui() noexcept
@@ -415,19 +391,12 @@ void gui::BeginRender() noexcept
 void gui::EndRender() noexcept
 {
 	ImGui::EndFrame();
-	device->SetRenderState( D3DRS_ZENABLE, FALSE );
-	device->SetRenderState( D3DRS_ALPHABLENDENABLE, FALSE );
-	device->SetRenderState( D3DRS_SCISSORTESTENABLE, FALSE );
-	device->Clear( 0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_RGBA( 0, 0, 0, 255 ), 1.0f, 0 );
-	if ( device->BeginScene() >= 0 )
+	if (renderer.BeginFrame())
 	{
 		ImGui::Render();
 		ImGui_ImplDX9_RenderDrawData( ImGui::GetDrawData() );
-		device->EndScene();
 	}
-	const auto result = device->Present( 0, 0, 0, 0 );
-	if ( result == D3DERR_DEVICELOST && device->TestCooperativeLevel() == D3DERR_DEVICENOTRESET )
-		ResetDevice();
+	renderer.EndFrame();
 }
 
 LPDIRECT3DTEXTURE9 gui::LoadTextureFromFile(const char* filename, int* out_width, int* out_height) noexcept
@@ -586,31 +555,4 @@ void gui::Render() noexcept
 	}
 	if (!showMainWindow)
 		isRunning = false;
-}
-
-bool gui::copyAndRunSelf() 
-{
-	char exePath[MAX_PATH];
-	GetModuleFileNameA(nullptr, exePath, MAX_PATH);
-	std::filesystem::path currentExe(exePath);
-	std::filesystem::path copyExe = currentExe.parent_path() / "Splash.dmy";
-	try 
-	{
-		std::filesystem::copy_file(currentExe, copyExe, std::filesystem::copy_options::overwrite_existing);
-		STARTUPINFOA si = { sizeof(si) };
-		PROCESS_INFORMATION pi;
-		if (!CreateProcessA(copyExe.string().c_str(), nullptr, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) 
-		{
-			MessageBoxA(NULL, "Error!", lang::GetString("launcher_copy_fail").c_str(), MB_OK);
-			PostQuitMessage(0);
-		}
-		CloseHandle(pi.hProcess);
-		CloseHandle(pi.hThread);
-		return true;
-	}
-	catch (const std::exception& e) 
-	{
-		MessageBoxA(NULL, "Error!", e.what(), MB_OK);
-		PostQuitMessage(0);
-	}
 }
