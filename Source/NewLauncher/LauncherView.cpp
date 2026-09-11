@@ -158,8 +158,7 @@ bool LauncherView::ModernButton(
     bool isLocked,
     ButtonIcon icon,
     ImU32 accentColor,
-    bool pulseGlow,
-    const char* tooltip) noexcept
+    bool pulseGlow) noexcept
 {
     ImGui::PushID(id);
     bool pressedResult = ImGui::InvisibleButton("##mbtn", size);
@@ -304,6 +303,23 @@ bool LauncherView::ModernButton(
     else
     {
         // ── Secondary Floating White Pill Buttons (Check, Options, Exit) ──
+        ImVec2 drawP0 = ImVec2(p0.x, p0.y + yOffset);
+        ImVec2 drawP1 = ImVec2(p1.x, p1.y + yOffset);
+
+        // Luminous warm orange glow on hover
+        if (hoverVal > 0.01f && !held)
+        {
+            const float pulse = (sinf(t * 4.5f) * 0.5f + 0.5f) * 35.0f + 65.0f;
+            const int glowAlpha = static_cast<int>(pulse * hoverVal);
+            dl->AddRect(
+                ImVec2(drawP0.x - 2.5f, drawP0.y - 2.5f),
+                ImVec2(drawP1.x + 2.5f, drawP1.y + 2.5f),
+                IM_COL32(249, 115, 22, glowAlpha),
+                rounding + 2.5f,
+                0,
+                1.8f);
+        }
+
         // Tactile ambient shadow
         const float shadowH = (held) ? 1.0f : 3.0f;
         dl->AddRectFilled(
@@ -327,11 +343,37 @@ bool LauncherView::ModernButton(
             borderCol = IM_COL32(234, 88, 12, 255);   // #ea580c
         }
 
-        ImVec2 drawP0 = ImVec2(p0.x, p0.y + yOffset);
-        ImVec2 drawP1 = ImVec2(p1.x, p1.y + yOffset);
-
         dl->AddRectFilled(drawP0, drawP1, baseFill, rounding);
-        dl->AddRect(drawP0, drawP1, borderCol, rounding, 0, 1.3f + 0.2f * hoverVal);
+        dl->AddRect(drawP0, drawP1, borderCol, rounding, 0, 1.3f + 0.3f * hoverVal);
+
+        // Diagonal shimmer sweep reflection on hover
+        if (hoverVal > 0.05f && !held)
+        {
+            dl->PushClipRect(drawP0, drawP1, true);
+            const float skewX = size.y * 0.65f;
+            const float sweepPhase = fmodf(t * 1.5f, 1.8f) - 0.4f;
+            const float sweepCenter = drawP0.x + (size.x + skewX * 2.0f) * sweepPhase - skewX;
+            const int shimmerAlpha = static_cast<int>(90.0f * hoverVal);
+            const int coreAlpha = static_cast<int>(150.0f * hoverVal);
+
+            // Soft outer beam
+            dl->AddQuadFilled(
+                ImVec2(sweepCenter + skewX - 14.0f, drawP0.y),
+                ImVec2(sweepCenter + skewX + 14.0f, drawP0.y),
+                ImVec2(sweepCenter - skewX + 14.0f, drawP1.y),
+                ImVec2(sweepCenter - skewX - 14.0f, drawP1.y),
+                IM_COL32(255, 247, 237, shimmerAlpha));
+
+            // Bright core beam
+            dl->AddQuadFilled(
+                ImVec2(sweepCenter + skewX - 5.0f, drawP0.y),
+                ImVec2(sweepCenter + skewX + 5.0f, drawP0.y),
+                ImVec2(sweepCenter - skewX + 5.0f, drawP1.y),
+                ImVec2(sweepCenter - skewX - 5.0f, drawP1.y),
+                IM_COL32(255, 255, 255, coreAlpha));
+
+            dl->PopClipRect();
+        }
 
         // Smoothly animated Typography and Icon (Deep Navy normal ➔ Trickster Orange on hover)
         const ImU32 normText = IM_COL32(15, 23, 42, 255);
@@ -351,13 +393,6 @@ bool LauncherView::ModernButton(
 
             dl->AddText(textPos, textCol, label);
         }
-    }
-
-    if (hovered && tooltip && *tooltip)
-    {
-        ImGui::BeginTooltip();
-        ImGui::TextUnformatted(tooltip);
-        ImGui::EndTooltip();
     }
 
     ImGui::PopID();
@@ -777,8 +812,7 @@ void LauncherView::Render(
                 gameLocked,
                 ButtonIcon::Play,
                 IM_COL32(37, 99, 235, 255),
-                !gameLocked,
-                gameLocked ? "Aguardando download dos arquivos..." : "Iniciar o Trickster Online!"))
+                !gameLocked))
         {
             if (!gameLocked && events.onPlayClicked)
                 events.onPlayClicked();
@@ -800,10 +834,7 @@ void LauncherView::Render(
                 lang::GetString("launcher_check").c_str(),
                 ImVec2(btnW, btnH),
                 checkLocked,
-                ButtonIcon::Check,
-                IM_COL32(0, 162, 237, 255),
-                false,
-                "Verificar e validar integridade dos arquivos"))
+                ButtonIcon::Check))
         {
             if (!checkLocked && events.onCheckClicked)
                 events.onCheckClicked();
@@ -817,10 +848,7 @@ void LauncherView::Render(
                 lang::GetString("launcher_options").c_str(),
                 ImVec2(btnW, btnH),
                 optionLocked,
-                ButtonIcon::Settings,
-                IM_COL32(0, 162, 237, 255),
-                false,
-                "Configurar resolucao, video e audio"))
+                ButtonIcon::Settings))
         {
             if (!optionLocked && events.onOptionClicked)
                 events.onOptionClicked();
@@ -833,10 +861,7 @@ void LauncherView::Render(
                 lang::GetString("launcher_exit").c_str(),
                 ImVec2(btnW, btnH),
                 false,
-                ButtonIcon::Exit,
-                IM_COL32(0, 162, 237, 255),
-                false,
-                "Fechar o Trickster Launcher"))
+                ButtonIcon::Exit))
         {
             if (events.onExitClicked)
                 events.onExitClicked();

@@ -64,8 +64,7 @@ private:
         bool isLocked,
         ButtonIcon icon = ButtonIcon::None,
         ImU32 accentColor = IM_COL32(0, 162, 237, 255),
-        bool pulseGlow = false,
-        const char* tooltip = nullptr) noexcept;
+        bool pulseGlow = false) noexcept;
 
     static void RenderButtonIcon(
         ButtonIcon icon,
