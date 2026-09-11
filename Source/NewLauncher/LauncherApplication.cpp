@@ -118,7 +118,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
 
     launcherWindow.SetMoveCallback([&webView]()
     {
-        const RECT bounds{ 19, 42, 19 + 501, 42 + 332 };
+        const RECT bounds{ 19, 40, 19 + 501, 40 + 326 };
         webView.SetBounds(bounds);
     });
 

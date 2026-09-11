@@ -518,23 +518,23 @@ void LauncherView::Render(
             1.8f);
         ImGui::PopID();
 
-        // 3. News WebView Floating Card Frame (16, 40, 522, 376)
+        // 3. News WebView Floating Card Frame (16, 38, 522, 368)
         dl->AddRectFilled(
-            ImVec2(17.0f, 41.0f),
-            ImVec2(523.0f, 377.0f),
+            ImVec2(17.0f, 39.0f),
+            ImVec2(523.0f, 369.0f),
             IM_COL32(30, 70, 120, 20),
             12.0f);
         dl->AddRect(
-            ImVec2(17.0f, 40.0f),
-            ImVec2(522.0f, 376.0f),
+            ImVec2(17.0f, 38.0f),
+            ImVec2(522.0f, 368.0f),
             IM_COL32(186, 215, 243, 255),
             12.0f,
             0,
             1.2f);
 
         // 4. Bottom Floating Card (Housing Progress, Telemetry and Controls)
-        const float bottomCardY = 384.0f;
-        const float bottomCardH = winSize.y - bottomCardY - 10.0f;
+        const float bottomCardY = 376.0f;
+        const float bottomCardH = winSize.y - bottomCardY - 8.0f;
         dl->AddRectFilled(
             ImVec2(14.0f, bottomCardY + 1.0f),
             ImVec2(winSize.x - 14.0f, bottomCardY + bottomCardH + 1.0f),
@@ -554,7 +554,7 @@ void LauncherView::Render(
             1.2f);
 
         // Status text & download speed chip
-        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 10));
+        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 8));
         if (fontBold_) ImGui::PushFont(fontBold_);
         ImGui::TextColored(ImVec4(0.06f, 0.09f, 0.16f, 1.0f), "%s", state.fileString.c_str());
         if (fontBold_) ImGui::PopFont();
@@ -564,7 +564,7 @@ void LauncherView::Render(
             ImVec2 textSize = ImGui::CalcTextSize(state.speedString.c_str());
             const float chipW = textSize.x + 16.0f;
             const float chipX = winSize.x - chipW - 28.0f;
-            const float chipY = bottomCardY + 8.0f;
+            const float chipY = bottomCardY + 6.0f;
 
             // Speed Chip Pill (Light Sky Blue Pill)
             dl->AddRectFilled(
@@ -588,7 +588,7 @@ void LauncherView::Render(
 
         // Dual Progress Bars
         // Progress bar 1: File progress (Soft Sky-Blue Capsule)
-        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 32));
+        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 28));
         RenderBeveledProgressBar(
             animFileProgress_,
             ImVec2(348, 8),
@@ -601,7 +601,7 @@ void LauncherView::Render(
             false);
 
         // Progress bar 2: Total progress (Vibrant Cerulean/Royal Blue Capsule with Percentage)
-        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 44));
+        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 40));
         RenderBeveledProgressBar(
             animTotalProgress_,
             ImVec2(348, 14),
@@ -613,14 +613,14 @@ void LauncherView::Render(
             7.0f,
             true);
 
-        // Primary Action: Big Game Start Button (Vibrant Royal Blue Pill like website เข้าสู่ระบบ)
-        ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 26));
+        // Primary Action: Big Game Start Button (Moved down below download speed badge)
+        ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 32));
         const bool gameLocked = !state.isGameEnabled;
         if (fontLarge_) ImGui::PushFont(fontLarge_);
         if (ModernButton(
                 "##play_btn",
                 lang::GetString("launcher_game_start").c_str(),
-                ImVec2(118, 52),
+                ImVec2(118, 50),
                 gameLocked,
                 IM_COL32(37, 99, 235, 255),
                 !gameLocked))
@@ -631,7 +631,7 @@ void LauncherView::Render(
         if (fontLarge_) ImGui::PopFont();
 
         // Secondary Action Buttons (Check, Options, Exit) - Floating White Pill Buttons
-        const float btnY = bottomCardY + 68.0f;
+        const float btnY = bottomCardY + 62.0f;
         const float btnW = 108.0f;
         const float btnH = 28.0f;
 
@@ -681,7 +681,7 @@ void LauncherView::Render(
         if (fontBold_) ImGui::PopFont();
 
         // 5. Footer: Website Link
-        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 106));
+        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 98));
         if (fontRegular_) ImGui::PushFont(fontRegular_);
         ImGui::TextColored(ImVec4(0.12f, 0.16f, 0.23f, 1.0f), "%s", lang::GetString("launcher_site_desc").c_str());
 

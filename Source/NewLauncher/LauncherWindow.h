@@ -22,7 +22,7 @@ public:
     bool PumpMessages() noexcept;
 
     static constexpr int kDefaultWidth = 538;
-    static constexpr int kDefaultHeight = 564;
+    static constexpr int kDefaultHeight = 526;
 
     HWND Handle() const noexcept { return window_; }
     bool IsRunning() const noexcept { return running_; }
