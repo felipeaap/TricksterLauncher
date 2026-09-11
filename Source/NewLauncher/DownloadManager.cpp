@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.h"
 
 namespace
@@ -425,8 +426,7 @@ bool DownloadMulti(const std::string& host,
         }
     }
 
-    std::vector<std::atomic<long long>> segmentProgresses;
-    segmentProgresses.resize(segments.size());
+    std::vector<std::atomic<long long>> segmentProgresses(segments.size());
     for (size_t i = 0; i < segments.size(); ++i)
     {
         const long long bytes = segments[i].end - segments[i].start + 1;

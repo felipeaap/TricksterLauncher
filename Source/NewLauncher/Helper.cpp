@@ -101,7 +101,7 @@ void Helper::FileCheckUpdate()
 {
     gui::g_iFileProgress.store(1.0f, std::memory_order_relaxed);
 
-    FileVerifier verifier([&](size_t current, size_t total, const Arquivo& file)
+    auto progressCallback = [&](size_t current, size_t total, const Arquivo& file)
     {
         float launcherPercent = total > 0
             ? static_cast<float>(current) / static_cast<float>(total)
@@ -116,7 +116,8 @@ void Helper::FileCheckUpdate()
             std::lock_guard<std::mutex> lock(gui::g_FileStringMutex);
             gui::g_FileString = lang::GetString("splash_check") + fileName;
         }
-    });
+    };
+    FileVerifier verifier(std::move(progressCallback));
 
     updateCount = verifier.CountUpdates(ListaArquivos);
     const bool success = WorkerUpdating(updateCount);

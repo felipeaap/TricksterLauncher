@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#define NOMINMAX
 #include <windows.h>
 
 #include "UpdateTypes.h"

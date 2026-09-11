@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #define NOMINMAX
 #include <Windows.h>
 #include <WinSock2.h>
@@ -15,6 +15,7 @@
 #include <mutex>
 #include <wil/com.h>
 #include <WebView2.h>
+#include "imgui.h"
 
 #pragma comment(lib, "user32.lib")
 
