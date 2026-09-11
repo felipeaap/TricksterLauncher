@@ -178,13 +178,12 @@ bool LauncherView::ModernButton(
     const float targetHover = (hovered && !isLocked) ? 1.0f : 0.0f;
     hoverVal += (targetHover - hoverVal) * (1.0f - expf(-18.0f * dt));
 
-    const float rounding = (std::min)(size.y * 0.5f, 18.0f); // Full smooth pill shape
+    const float rounding = size.y * 0.5f; // Full smooth rounded pill capsule
     const float t = static_cast<float>(ImGui::GetTime());
-    const bool isPrimaryCTA = (accentColor == IM_COL32(37, 99, 235, 255)) || pulseGlow;
     const float yOffset = (held && !isLocked) ? 1.2f : 0.0f;
 
     // Icon & Label geometry
-    const float iconSize = (icon != ButtonIcon::None) ? ((icon == ButtonIcon::Play) ? 14.0f : 12.0f) : 0.0f;
+    const float iconSize = (icon != ButtonIcon::None) ? ((icon == ButtonIcon::Play) ? 15.0f : 12.0f) : 0.0f;
     const float iconSpacing = (icon != ButtonIcon::None && label && *label) ? 6.0f : 0.0f;
     ImVec2 textSize = (label && *label) ? ImGui::CalcTextSize(label) : ImVec2(0, 0);
     const float totalContentW = iconSize + iconSpacing + textSize.x;
@@ -211,93 +210,24 @@ bool LauncherView::ModernButton(
                 p0.y + (size.y - textSize.y) * 0.5f);
             dl->AddText(textPos, lockedCol, label);
         }
-    }
-    else if (isPrimaryCTA)
+    else
     {
+        // ── Floating Clean Pill Buttons (Matching Trickster Classic Theme) ──
         ImVec2 drawP0 = ImVec2(p0.x, p0.y + yOffset);
         ImVec2 drawP1 = ImVec2(p1.x, p1.y + yOffset);
 
-        const ImU32 baseTop = IM_COL32(37, 99, 235, 255);   // #2563eb
-        const ImU32 hoverTop = IM_COL32(59, 130, 246, 255);  // #3b82f6
-        ImU32 colTop = BlendCol(baseTop, hoverTop, hoverVal);
-        if (held)
+        // Idle breathing pulse aura for primary CTA (Game Start / Connect)
+        if (pulseGlow && hoverVal <= 0.01f && !held)
         {
-            colTop = IM_COL32(30, 64, 175, 255);
-        }
-
-        if (pulseGlow)
-        {
-            const float pulseAlpha = (sinf(t * 3.5f) * 0.5f + 0.5f) * 70.0f + 30.0f;
+            const float pulse = (sinf(t * 3.5f) * 0.5f + 0.5f) * 40.0f + 30.0f;
             dl->AddRect(
                 ImVec2(drawP0.x - 2.5f, drawP0.y - 2.5f),
                 ImVec2(drawP1.x + 2.5f, drawP1.y + 2.5f),
-                IM_COL32(37, 99, 235, static_cast<int>(pulseAlpha)),
+                IM_COL32(249, 115, 22, static_cast<int>(pulse)),
                 rounding + 2.5f,
                 0,
-                1.8f);
+                1.5f);
         }
-
-        // Tactile depth shadow
-        const float shadowH = (held) ? 1.5f : 3.5f;
-        dl->AddRectFilled(
-            ImVec2(p0.x + 1.0f, p0.y + 2.0f),
-            ImVec2(p1.x - 1.0f, p1.y + shadowH),
-            IM_COL32(30, 64, 175, 45),
-            rounding);
-
-        // Solid rounded pill fill
-        dl->AddRectFilled(drawP0, drawP1, colTop, rounding);
-
-        // Soft top-half specular sheen
-        const int sheenAlpha = static_cast<int>(35.0f + 25.0f * hoverVal);
-        dl->AddRectFilled(
-            drawP0,
-            ImVec2(drawP1.x, drawP0.y + size.y * 0.48f),
-            IM_COL32(255, 255, 255, sheenAlpha),
-            rounding,
-            ImDrawFlags_RoundCornersTop);
-
-        // Luminous border
-        dl->AddRect(drawP0, drawP1, IM_COL32(191, 219, 254, 240), rounding, 0, 1.4f);
-
-        // Diagonal shimmer sweep glide
-        if (!held)
-        {
-            dl->PushClipRect(drawP0, drawP1, true);
-            const float skewX = size.y * 0.6f;
-            const float sweepPhase = fmodf(t * 0.9f, 2.2f) - 0.5f;
-            const float sweepCenter = drawP0.x + (size.x + skewX * 2.0f) * sweepPhase - skewX;
-            dl->AddQuadFilled(
-                ImVec2(sweepCenter + skewX - 16.0f, drawP0.y),
-                ImVec2(sweepCenter + skewX + 16.0f, drawP0.y),
-                ImVec2(sweepCenter - skewX + 16.0f, drawP1.y),
-                ImVec2(sweepCenter - skewX - 16.0f, drawP1.y),
-                IM_COL32(255, 255, 255, 45));
-            dl->PopClipRect();
-        }
-
-        // Crisp White Typography & Play Icon with soft depth
-        if (icon != ButtonIcon::None)
-        {
-            RenderButtonIcon(icon, ImVec2(startX + iconSize * 0.5f, centerY + 1.0f), iconSize, IM_COL32(15, 23, 42, 160), dl);
-            RenderButtonIcon(icon, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, IM_COL32(255, 255, 255, 255), dl);
-        }
-
-        if (label && *label)
-        {
-            ImVec2 textPos(
-                (icon != ButtonIcon::None) ? (startX + iconSize + iconSpacing) : (p0.x + (size.x - textSize.x) * 0.5f),
-                p0.y + (size.y - textSize.y) * 0.5f + yOffset);
-
-            dl->AddText(ImVec2(textPos.x + 0.5f, textPos.y + 1.0f), IM_COL32(15, 23, 42, 180), label);
-            dl->AddText(textPos, IM_COL32(255, 255, 255, 255), label);
-        }
-    }
-    else
-    {
-        // ── Secondary Floating White Pill Buttons (Check, Options, Exit) ──
-        ImVec2 drawP0 = ImVec2(p0.x, p0.y + yOffset);
-        ImVec2 drawP1 = ImVec2(p1.x, p1.y + yOffset);
 
         // Luminous warm orange glow on hover
         if (hoverVal > 0.01f && !held)
@@ -305,16 +235,16 @@ bool LauncherView::ModernButton(
             const float pulse = (sinf(t * 4.5f) * 0.5f + 0.5f) * 35.0f + 65.0f;
             const int glowAlpha = static_cast<int>(pulse * hoverVal);
             dl->AddRect(
-                ImVec2(drawP0.x - 2.5f, drawP0.y - 2.5f),
-                ImVec2(drawP1.x + 2.5f, drawP1.y + 2.5f),
+                ImVec2(drawP0.x - 3.0f, drawP0.y - 3.0f),
+                ImVec2(drawP1.x + 3.0f, drawP1.y + 3.0f),
                 IM_COL32(249, 115, 22, glowAlpha),
-                rounding + 2.5f,
+                rounding + 3.0f,
                 0,
-                1.8f);
+                2.0f);
         }
 
         // Tactile ambient shadow
-        const float shadowH = (held) ? 1.0f : 3.0f;
+        const float shadowH = (held) ? 1.0f : ((size.y > 40.0f) ? 4.0f : 3.0f);
         dl->AddRectFilled(
             ImVec2(p0.x, p0.y + 1.0f),
             ImVec2(p1.x, p1.y + shadowH),
@@ -324,7 +254,7 @@ bool LauncherView::ModernButton(
         // Smoothly animated Base fill & Border with Trickster Orange Palette
         const ImU32 normFill = IM_COL32(255, 255, 255, 255);
         const ImU32 hovFill = IM_COL32(255, 247, 237, 255); // #fff7ed
-        const ImU32 normBorder = IM_COL32(148, 163, 184, 255); // #94a3b8
+        const ImU32 normBorder = pulseGlow ? IM_COL32(249, 115, 22, 180) : IM_COL32(148, 163, 184, 255);
         const ImU32 hovBorder = IM_COL32(249, 115, 22, 255);  // #f97316
 
         ImU32 baseFill = BlendCol(normFill, hovFill, hoverVal);
@@ -337,32 +267,34 @@ bool LauncherView::ModernButton(
         }
 
         dl->AddRectFilled(drawP0, drawP1, baseFill, rounding);
-        dl->AddRect(drawP0, drawP1, borderCol, rounding, 0, 1.3f + 0.3f * hoverVal);
+        dl->AddRect(drawP0, drawP1, borderCol, rounding, 0, (size.y > 40.0f ? 1.8f : 1.3f) + 0.3f * hoverVal);
 
-        // Diagonal shimmer sweep reflection on hover
-        if (hoverVal > 0.05f && !held)
+        // Diagonal shimmer sweep reflection on hover or primary CTA
+        if ((hoverVal > 0.05f || pulseGlow) && !held)
         {
+            const float shimmerFactor = hoverVal > 0.05f ? hoverVal : 0.4f;
             dl->PushClipRect(drawP0, drawP1, true);
             const float skewX = size.y * 0.65f;
-            const float sweepPhase = fmodf(t * 1.5f, 1.8f) - 0.4f;
+            const float sweepSpeed = hoverVal > 0.05f ? 1.5f : 0.8f;
+            const float sweepPhase = fmodf(t * sweepSpeed, 2.0f) - 0.5f;
             const float sweepCenter = drawP0.x + (size.x + skewX * 2.0f) * sweepPhase - skewX;
-            const int shimmerAlpha = static_cast<int>(90.0f * hoverVal);
-            const int coreAlpha = static_cast<int>(150.0f * hoverVal);
+            const int shimmerAlpha = static_cast<int>(90.0f * shimmerFactor);
+            const int coreAlpha = static_cast<int>(150.0f * shimmerFactor);
 
             // Soft outer beam
             dl->AddQuadFilled(
-                ImVec2(sweepCenter + skewX - 14.0f, drawP0.y),
-                ImVec2(sweepCenter + skewX + 14.0f, drawP0.y),
-                ImVec2(sweepCenter - skewX + 14.0f, drawP1.y),
-                ImVec2(sweepCenter - skewX - 14.0f, drawP1.y),
+                ImVec2(sweepCenter + skewX - 16.0f, drawP0.y),
+                ImVec2(sweepCenter + skewX + 16.0f, drawP0.y),
+                ImVec2(sweepCenter - skewX + 16.0f, drawP1.y),
+                ImVec2(sweepCenter - skewX - 16.0f, drawP1.y),
                 IM_COL32(255, 247, 237, shimmerAlpha));
 
             // Bright core beam
             dl->AddQuadFilled(
-                ImVec2(sweepCenter + skewX - 5.0f, drawP0.y),
-                ImVec2(sweepCenter + skewX + 5.0f, drawP0.y),
-                ImVec2(sweepCenter - skewX + 5.0f, drawP1.y),
-                ImVec2(sweepCenter - skewX - 5.0f, drawP1.y),
+                ImVec2(sweepCenter + skewX - 6.0f, drawP0.y),
+                ImVec2(sweepCenter + skewX + 6.0f, drawP0.y),
+                ImVec2(sweepCenter - skewX + 6.0f, drawP1.y),
+                ImVec2(sweepCenter - skewX - 6.0f, drawP1.y),
                 IM_COL32(255, 255, 255, coreAlpha));
 
             dl->PopClipRect();
