@@ -214,58 +214,51 @@ bool LauncherView::ModernButton(
     }
     else if (isPrimaryCTA)
     {
-        // ── Primary Call-To-Action Button (Royal Blue Pill like website เข้าสู่ระบบ) ──
-        if (pulseGlow)
-        {
-            const float pulseAlpha = (sinf(t * 3.5f) * 0.5f + 0.5f) * 90.0f + 50.0f;
-            dl->AddRect(
-                ImVec2(p0.x - 3.0f, p0.y - 3.0f),
-                ImVec2(p1.x + 3.0f, p1.y + 3.0f),
-                IM_COL32(37, 99, 235, static_cast<int>(pulseAlpha)),
-                rounding + 3.0f,
-                0,
-                2.0f);
-        }
-
-        // Tactile depth shadow
-        const float shadowH = (held) ? 1.5f : 4.5f;
-        dl->AddRectFilled(
-            ImVec2(p0.x + 1.0f, p0.y + 2.0f),
-            ImVec2(p1.x - 1.0f, p1.y + shadowH),
-            IM_COL32(30, 64, 175, 60),
-            rounding);
-
-        // Gradient Fill (smoothly blended on hover)
-        const ImU32 baseTop = IM_COL32(37, 99, 235, 255);   // #2563eb
-        const ImU32 baseBottom = IM_COL32(29, 78, 216, 255); // #1d4ed8
-        const ImU32 hoverTop = IM_COL32(59, 130, 246, 255);  // #3b82f6
-        const ImU32 hoverBottom = IM_COL32(37, 99, 235, 255);
-
-        ImU32 colTop = BlendCol(baseTop, hoverTop, hoverVal);
-        ImU32 colBottom = BlendCol(baseBottom, hoverBottom, hoverVal);
-
-        if (held)
-        {
-            colTop = IM_COL32(30, 64, 175, 255);
-            colBottom = IM_COL32(29, 78, 216, 255);
-        }
-
         ImVec2 drawP0 = ImVec2(p0.x, p0.y + yOffset);
         ImVec2 drawP1 = ImVec2(p1.x, p1.y + yOffset);
 
-        dl->AddRectFilledMultiColor(drawP0, drawP1, colTop, colTop, colBottom, colBottom);
+        const ImU32 baseTop = IM_COL32(37, 99, 235, 255);   // #2563eb
+        const ImU32 hoverTop = IM_COL32(59, 130, 246, 255);  // #3b82f6
+        ImU32 colTop = BlendCol(baseTop, hoverTop, hoverVal);
+        if (held)
+        {
+            colTop = IM_COL32(30, 64, 175, 255);
+        }
+
+        if (pulseGlow)
+        {
+            const float pulseAlpha = (sinf(t * 3.5f) * 0.5f + 0.5f) * 70.0f + 30.0f;
+            dl->AddRect(
+                ImVec2(drawP0.x - 2.5f, drawP0.y - 2.5f),
+                ImVec2(drawP1.x + 2.5f, drawP1.y + 2.5f),
+                IM_COL32(37, 99, 235, static_cast<int>(pulseAlpha)),
+                rounding + 2.5f,
+                0,
+                1.8f);
+        }
+
+        // Tactile depth shadow
+        const float shadowH = (held) ? 1.5f : 3.5f;
+        dl->AddRectFilled(
+            ImVec2(p0.x + 1.0f, p0.y + 2.0f),
+            ImVec2(p1.x - 1.0f, p1.y + shadowH),
+            IM_COL32(30, 64, 175, 45),
+            rounding);
+
+        // Solid rounded pill fill
+        dl->AddRectFilled(drawP0, drawP1, colTop, rounding);
 
         // Soft top-half specular sheen
-        const int sheenAlpha = static_cast<int>(45.0f + 25.0f * hoverVal);
+        const int sheenAlpha = static_cast<int>(35.0f + 25.0f * hoverVal);
         dl->AddRectFilled(
             drawP0,
-            ImVec2(drawP1.x, drawP0.y + size.y * 0.45f),
+            ImVec2(drawP1.x, drawP0.y + size.y * 0.48f),
             IM_COL32(255, 255, 255, sheenAlpha),
             rounding,
             ImDrawFlags_RoundCornersTop);
 
         // Luminous border
-        dl->AddRect(drawP0, drawP1, IM_COL32(191, 219, 254, 240), rounding, 0, 1.2f);
+        dl->AddRect(drawP0, drawP1, IM_COL32(191, 219, 254, 240), rounding, 0, 1.4f);
 
         // Diagonal shimmer sweep glide
         if (!held)
