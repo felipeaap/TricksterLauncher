@@ -30,6 +30,7 @@ public:
     void RequestClose() noexcept { shouldClose_ = true; }
 
     void OnPlay() noexcept;
+    void OnConnect(const std::string& account, const std::string& password, bool saveAccount) noexcept;
     void OnCheckFiles() noexcept;
     void OnOption() noexcept;
     void OnExit() noexcept;
@@ -40,7 +41,7 @@ private:
     std::string FetchFromCDN(const std::string& path) const;
     void CheckUpdatesAsync(bool isFullCheck);
     bool RunInstaller(const std::vector<Arquivo>& files, int pendingUpdateCount);
-    void LaunchGame();
+    void LaunchGame(const std::string& account = "", const std::string& password = "");
     void CheckSelfUpdate();
     std::filesystem::path GetGamePath() const;
 

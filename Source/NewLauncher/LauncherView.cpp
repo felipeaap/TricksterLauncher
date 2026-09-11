@@ -545,6 +545,128 @@ void LauncherView::RenderBeveledProgressBar(
     ImGui::Dummy(size);
 }
 
+void LauncherView::SetSavedAccount(const std::string& account, bool remember) noexcept
+{
+    rememberAccount_ = remember;
+    if (!account.empty())
+    {
+        strncpy_s(accountBuffer_, account.c_str(), sizeof(accountBuffer_) - 1);
+    }
+}
+
+void LauncherView::RenderLoginForm(
+    float bottomCardY,
+    const ImVec2& winSize,
+    const LauncherViewEvents& events) noexcept
+{
+    // 1. Header / Status line
+    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 8));
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    if (!authErrorText_.empty())
+    {
+        ImGui::TextColored(ImVec4(0.88f, 0.20f, 0.20f, 1.0f), "%s", authErrorText_.c_str());
+    }
+    else
+    {
+        ImGui::TextColored(ImVec4(0.06f, 0.09f, 0.16f, 1.0f), "%s", lang::GetString("launcher_login_account").c_str());
+    }
+    if (fontBold_) ImGui::PopFont();
+
+    // 2. Custom Input Styles for Modern Pastel Theme
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 5.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.2f);
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(248, 250, 252, 255));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(241, 245, 249, 255));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, IM_COL32(255, 255, 255, 255));
+    ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(186, 215, 243, 255));
+    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(15, 23, 42, 255));
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled, IM_COL32(148, 163, 184, 255));
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
+
+    // Account ID Input
+    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 28));
+    ImGui::SetNextItemWidth(210.0f);
+    bool enterAccount = ImGui::InputTextWithHint(
+        "##account_input",
+        lang::GetString("launcher_login_account").c_str(),
+        accountBuffer_,
+        sizeof(accountBuffer_),
+        ImGuiInputTextFlags_EnterReturnsTrue);
+
+    // Password Input
+    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 58));
+    ImGui::SetNextItemWidth(210.0f);
+    bool enterPass = ImGui::InputTextWithHint(
+        "##password_input",
+        lang::GetString("launcher_login_password").c_str(),
+        passwordBuffer_,
+        sizeof(passwordBuffer_),
+        ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
+
+    if (fontRegular_) ImGui::PopFont();
+
+    // Remember ID Checkbox
+    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 88));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::PushStyleColor(ImGuiCol_CheckMark, IM_COL32(37, 99, 235, 255));
+    ImGui::Checkbox(lang::GetString("launcher_login_remember").c_str(), &rememberAccount_);
+    ImGui::PopStyleColor();
+    if (fontSmall_) ImGui::PopFont();
+
+    ImGui::PopStyleColor(6);
+    ImGui::PopStyleVar(3);
+
+    // 3. BACK Button
+    ImGui::SetCursorPos(ImVec2(248, bottomCardY + 44));
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    if (ModernButton(
+            "##btn_back",
+            lang::GetString("launcher_login_back").c_str(),
+            ImVec2(96, 32),
+            false,
+            ButtonIcon::Exit))
+    {
+        showLoginForm_ = false;
+        authErrorText_.clear();
+    }
+    if (fontBold_) ImGui::PopFont();
+
+    // 4. Primary CONNECT Button
+    ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 32));
+    if (fontLarge_) ImGui::PushFont(fontLarge_);
+    bool connectClicked = ModernButton(
+        "##connect_btn",
+        lang::GetString("launcher_login_connect").c_str(),
+        ImVec2(118, 58),
+        false,
+        ButtonIcon::Play,
+        IM_COL32(37, 99, 235, 255),
+        true);
+    if (fontLarge_) ImGui::PopFont();
+
+    if (connectClicked || enterAccount || enterPass)
+    {
+        if (events.onConnectClicked)
+        {
+            events.onConnectClicked(accountBuffer_, passwordBuffer_, rememberAccount_);
+        }
+    }
+
+    // 5. Footer: Website Link
+    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 114));
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
+    ImGui::TextColored(ImVec4(0.12f, 0.16f, 0.23f, 1.0f), "%s", lang::GetString("launcher_site_desc").c_str());
+
+    ImGui::SameLine(0, 6.0f);
+    RenderLink(
+        lang::GetString("launcher_site_click").c_str(),
+        config::WebsiteLink.c_str(),
+        events.onLinkClicked);
+    if (fontRegular_) ImGui::PopFont();
+}
+
 void LauncherView::Render(
     const LauncherViewState& state,
     const LauncherViewEvents& events) noexcept
@@ -599,37 +721,33 @@ void LauncherView::Render(
         dl->AddRectFilled(ImVec2(0, 0), ImVec2(winSize.x, 34), IM_COL32(255, 255, 255, 230), 16.0f, ImDrawFlags_RoundCornersTop);
         dl->AddLine(ImVec2(0, 34), ImVec2(winSize.x, 34), IM_COL32(203, 213, 225, 220), 1.0f);
 
-        // Brand Title Badge ("Trickster Classic")
-        ImGui::SetCursorPos(ImVec2(16, 7));
+        // Logo Icon & Title
+        const char* titleText = "Trickster Online";
         if (fontBold_) ImGui::PushFont(fontBold_);
-        ImGui::TextColored(ImVec4(0.06f, 0.16f, 0.32f, 1.0f), "Trickster");
-        ImGui::SameLine(0, 5.0f);
-        ImGui::TextColored(ImVec4(0.85f, 0.40f, 0.02f, 1.0f), "Classic");
+        dl->AddText(ImVec2(16, 8), IM_COL32(15, 23, 42, 255), titleText);
         if (fontBold_) ImGui::PopFont();
 
-        // Server Status Pill Badge (Light Blue Capsule like website "ศูนย์ข่าวเซิร์ฟเวอร์")
-        const float t = static_cast<float>(ImGui::GetTime());
-        const bool isMaint = state.fileString.find("manuten") != std::string::npos ||
-                             state.fileString.find("Maintenance") != std::string::npos;
-        const char* statusText = isMaint ? "MAINTENANCE" : "ONLINE";
-        ImVec2 stSize = ImGui::CalcTextSize(statusText);
-        const float pillW = stSize.x + 24.0f;
-        const float pillX = winSize.x - 72.0f - pillW;
+        // Server Status Tag Pill
+        const bool isMaint = (state.fileString == lang::GetString("launcher_worker_maintenance"));
+        const char* statusText = isMaint ? "Maintenance" : "Server Online";
+        const float pillX = 142.0f;
 
+        // Pill background
         dl->AddRectFilled(
             ImVec2(pillX, 6),
-            ImVec2(pillX + pillW, 28),
-            isMaint ? IM_COL32(254, 226, 226, 245) : IM_COL32(219, 234, 254, 245),
+            ImVec2(pillX + 104, 28),
+            isMaint ? IM_COL32(254, 226, 226, 240) : IM_COL32(238, 242, 255, 240),
             11.0f);
         dl->AddRect(
             ImVec2(pillX, 6),
-            ImVec2(pillX + pillW, 28),
-            isMaint ? IM_COL32(252, 165, 165, 240) : IM_COL32(96, 165, 250, 240),
+            ImVec2(pillX + 104, 28),
+            isMaint ? IM_COL32(248, 113, 113, 220) : IM_COL32(165, 180, 252, 220),
             11.0f,
             0,
             1.0f);
 
         // Glowing indicator circle
+        const float t = static_cast<float>(ImGui::GetTime());
         const float pulseDot = (sinf(t * 4.0f) * 0.5f + 0.5f) * 55.0f + 200.0f;
         ImU32 dotCol = isMaint
             ? IM_COL32(239, 68, 68, static_cast<int>(pulseDot))
@@ -700,7 +818,7 @@ void LauncherView::Render(
             0,
             1.2f);
 
-        // 4. Bottom Floating Card (Housing Progress, Telemetry and Controls)
+        // 4. Bottom Floating Card (Housing Progress, Telemetry, Controls or Login Form)
         const float bottomCardY = 376.0f;
         const float bottomCardH = winSize.y - bottomCardY - 8.0f;
         dl->AddRectFilled(
@@ -721,147 +839,158 @@ void LauncherView::Render(
             0,
             1.2f);
 
-        // Status text & download speed chip
-        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 8));
-        if (fontBold_) ImGui::PushFont(fontBold_);
-        ImGui::TextColored(ImVec4(0.06f, 0.09f, 0.16f, 1.0f), "%s", state.fileString.c_str());
-        if (fontBold_) ImGui::PopFont();
-
-        if (!state.speedString.empty())
+        if (showLoginForm_)
         {
-            ImVec2 textSize = ImGui::CalcTextSize(state.speedString.c_str());
-            const float chipW = textSize.x + 16.0f;
-            const float chipX = winSize.x - chipW - 28.0f;
-            const float chipY = bottomCardY + 6.0f;
-
-            // Speed Chip Pill (Light Sky Blue Pill)
-            dl->AddRectFilled(
-                ImVec2(chipX, chipY),
-                ImVec2(chipX + chipW, chipY + 20),
-                IM_COL32(219, 234, 254, 245),
-                10.0f);
-            dl->AddRect(
-                ImVec2(chipX, chipY),
-                ImVec2(chipX + chipW, chipY + 20),
-                IM_COL32(96, 165, 250, 240),
-                10.0f,
-                0,
-                1.0f);
-
-            ImGui::SetCursorPos(ImVec2(chipX + 8, chipY + 2.5f));
-            if (fontSmall_) ImGui::PushFont(fontSmall_);
-            ImGui::TextColored(ImVec4(0.11f, 0.31f, 0.85f, 1.0f), "%s", state.speedString.c_str());
-            if (fontSmall_) ImGui::PopFont();
+            RenderLoginForm(bottomCardY, winSize, events);
         }
-
-        // Dual Progress Bars
-        // Progress bar 1: File progress (Soft Sky-Blue Capsule)
-        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 28));
-        RenderBeveledProgressBar(
-            animFileProgress_,
-            ImVec2(348, 8),
-            IM_COL32(147, 197, 253, 255), // #93c5fd
-            IM_COL32(96, 165, 250, 255),  // #60a5fa
-            IM_COL32(255, 255, 255, 160),
-            IM_COL32(59, 130, 246, 100),
-            IM_COL32(37, 99, 235, 140),
-            4.0f,
-            false);
-
-        // Progress bar 2: Total progress (Vibrant Cerulean/Royal Blue Capsule with Percentage)
-        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 40));
-        RenderBeveledProgressBar(
-            animTotalProgress_,
-            ImVec2(348, 14),
-            IM_COL32(56, 189, 248, 255),  // #38bdf8
-            IM_COL32(37, 99, 235, 255),   // #2563eb
-            IM_COL32(255, 255, 255, 180),
-            IM_COL32(29, 78, 216, 120),
-            IM_COL32(30, 64, 175, 150),
-            7.0f,
-            true);
-
-        // Primary Action: Big Game Start Button (Moved down below download speed badge)
-        ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 32));
-        const bool gameLocked = !state.isGameEnabled;
-        if (fontLarge_) ImGui::PushFont(fontLarge_);
-        if (ModernButton(
-                "##play_btn",
-                lang::GetString("launcher_game_start").c_str(),
-                ImVec2(118, 58),
-                gameLocked,
-                ButtonIcon::Play,
-                IM_COL32(37, 99, 235, 255),
-                !gameLocked))
+        else
         {
-            if (!gameLocked && events.onPlayClicked)
-                events.onPlayClicked();
+            // Status text & download speed chip
+            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 8));
+            if (fontBold_) ImGui::PushFont(fontBold_);
+            ImGui::TextColored(ImVec4(0.06f, 0.09f, 0.16f, 1.0f), "%s", state.fileString.c_str());
+            if (fontBold_) ImGui::PopFont();
+
+            if (!state.speedString.empty())
+            {
+                ImVec2 textSize = ImGui::CalcTextSize(state.speedString.c_str());
+                const float chipW = textSize.x + 16.0f;
+                const float chipX = winSize.x - chipW - 28.0f;
+                const float chipY = bottomCardY + 6.0f;
+
+                // Speed Chip Pill (Light Sky Blue Pill)
+                dl->AddRectFilled(
+                    ImVec2(chipX, chipY),
+                    ImVec2(chipX + chipW, chipY + 20),
+                    IM_COL32(219, 234, 254, 245),
+                    10.0f);
+                dl->AddRect(
+                    ImVec2(chipX, chipY),
+                    ImVec2(chipX + chipW, chipY + 20),
+                    IM_COL32(96, 165, 250, 240),
+                    10.0f,
+                    0,
+                    1.0f);
+
+                ImGui::SetCursorPos(ImVec2(chipX + 8, chipY + 2.5f));
+                if (fontSmall_) ImGui::PushFont(fontSmall_);
+                ImGui::TextColored(ImVec4(0.11f, 0.31f, 0.85f, 1.0f), "%s", state.speedString.c_str());
+                if (fontSmall_) ImGui::PopFont();
+            }
+
+            // Dual Progress Bars
+            // Progress bar 1: File progress (Soft Sky-Blue Capsule)
+            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 28));
+            RenderBeveledProgressBar(
+                animFileProgress_,
+                ImVec2(348, 8),
+                IM_COL32(147, 197, 253, 255), // #93c5fd
+                IM_COL32(96, 165, 250, 255),  // #60a5fa
+                IM_COL32(255, 255, 255, 160),
+                IM_COL32(59, 130, 246, 100),
+                IM_COL32(37, 99, 235, 140),
+                4.0f,
+                false);
+
+            // Progress bar 2: Total progress (Vibrant Cerulean/Royal Blue Capsule with Percentage)
+            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 40));
+            RenderBeveledProgressBar(
+                animTotalProgress_,
+                ImVec2(348, 14),
+                IM_COL32(56, 189, 248, 255),  // #38bdf8
+                IM_COL32(37, 99, 235, 255),   // #2563eb
+                IM_COL32(255, 255, 255, 180),
+                IM_COL32(29, 78, 216, 120),
+                IM_COL32(30, 64, 175, 150),
+                7.0f,
+                true);
+
+            // Primary Action: Big Game Start Button (Transitions to Login Form on click)
+            ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 32));
+            const bool gameLocked = !state.isGameEnabled;
+            if (fontLarge_) ImGui::PushFont(fontLarge_);
+            if (ModernButton(
+                    "##play_btn",
+                    lang::GetString("launcher_game_start").c_str(),
+                    ImVec2(118, 58),
+                    gameLocked,
+                    ButtonIcon::Play,
+                    IM_COL32(37, 99, 235, 255),
+                    !gameLocked))
+            {
+                if (!gameLocked)
+                {
+                    showLoginForm_ = true;
+                    if (events.onPlayClicked)
+                        events.onPlayClicked();
+                }
+            }
+            if (fontLarge_) ImGui::PopFont();
+
+            // Secondary Action Buttons (Check, Options, Exit) - Floating White Pill Buttons
+            const float btnY = bottomCardY + 62.0f;
+            const float btnW = 108.0f;
+            const float btnH = 28.0f;
+
+            if (fontBold_) ImGui::PushFont(fontBold_);
+
+            // Button: Check Files
+            ImGui::SetCursorPos(ImVec2(28, btnY));
+            const bool checkLocked = !state.isCheckEnabled;
+            if (ModernButton(
+                    "##btn_check",
+                    lang::GetString("launcher_check").c_str(),
+                    ImVec2(btnW, btnH),
+                    checkLocked,
+                    ButtonIcon::Check))
+            {
+                if (!checkLocked && events.onCheckClicked)
+                    events.onCheckClicked();
+            }
+
+            // Button: Options
+            ImGui::SetCursorPos(ImVec2(146, btnY));
+            const bool optionLocked = !state.isOptionEnabled;
+            if (ModernButton(
+                    "##btn_options",
+                    lang::GetString("launcher_options").c_str(),
+                    ImVec2(btnW, btnH),
+                    optionLocked,
+                    ButtonIcon::Settings))
+            {
+                if (!optionLocked && events.onOptionClicked)
+                    events.onOptionClicked();
+            }
+
+            // Button: Exit
+            ImGui::SetCursorPos(ImVec2(264, btnY));
+            if (ModernButton(
+                    "##btn_exit",
+                    lang::GetString("launcher_exit").c_str(),
+                    ImVec2(btnW, btnH),
+                    false,
+                    ButtonIcon::Exit))
+            {
+                if (events.onExitClicked)
+                    events.onExitClicked();
+                else
+                    shouldClose_ = true;
+            }
+
+            if (fontBold_) ImGui::PopFont();
+
+            // 5. Footer: Website Link
+            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 98));
+            if (fontRegular_) ImGui::PushFont(fontRegular_);
+            ImGui::TextColored(ImVec4(0.12f, 0.16f, 0.23f, 1.0f), "%s", lang::GetString("launcher_site_desc").c_str());
+
+            ImGui::SameLine(0, 6.0f);
+            RenderLink(
+                lang::GetString("launcher_site_click").c_str(),
+                config::WebsiteLink.c_str(),
+                events.onLinkClicked);
+            if (fontRegular_) ImGui::PopFont();
         }
-        if (fontLarge_) ImGui::PopFont();
-
-        // Secondary Action Buttons (Check, Options, Exit) - Floating White Pill Buttons
-        const float btnY = bottomCardY + 62.0f;
-        const float btnW = 108.0f;
-        const float btnH = 28.0f;
-
-        if (fontBold_) ImGui::PushFont(fontBold_);
-
-        // Button: Check Files
-        ImGui::SetCursorPos(ImVec2(28, btnY));
-        const bool checkLocked = !state.isCheckEnabled;
-        if (ModernButton(
-                "##btn_check",
-                lang::GetString("launcher_check").c_str(),
-                ImVec2(btnW, btnH),
-                checkLocked,
-                ButtonIcon::Check))
-        {
-            if (!checkLocked && events.onCheckClicked)
-                events.onCheckClicked();
-        }
-
-        // Button: Options
-        ImGui::SetCursorPos(ImVec2(146, btnY));
-        const bool optionLocked = !state.isOptionEnabled;
-        if (ModernButton(
-                "##btn_options",
-                lang::GetString("launcher_options").c_str(),
-                ImVec2(btnW, btnH),
-                optionLocked,
-                ButtonIcon::Settings))
-        {
-            if (!optionLocked && events.onOptionClicked)
-                events.onOptionClicked();
-        }
-
-        // Button: Exit
-        ImGui::SetCursorPos(ImVec2(264, btnY));
-        if (ModernButton(
-                "##btn_exit",
-                lang::GetString("launcher_exit").c_str(),
-                ImVec2(btnW, btnH),
-                false,
-                ButtonIcon::Exit))
-        {
-            if (events.onExitClicked)
-                events.onExitClicked();
-            else
-                shouldClose_ = true;
-        }
-
-        if (fontBold_) ImGui::PopFont();
-
-        // 5. Footer: Website Link
-        ImGui::SetCursorPos(ImVec2(28, bottomCardY + 98));
-        if (fontRegular_) ImGui::PushFont(fontRegular_);
-        ImGui::TextColored(ImVec4(0.12f, 0.16f, 0.23f, 1.0f), "%s", lang::GetString("launcher_site_desc").c_str());
-
-        ImGui::SameLine(0, 6.0f);
-        RenderLink(
-            lang::GetString("launcher_site_click").c_str(),
-            config::WebsiteLink.c_str(),
-            events.onLinkClicked);
-        if (fontRegular_) ImGui::PopFont();
 
         ImGui::End();
     }

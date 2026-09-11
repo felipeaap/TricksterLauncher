@@ -23,6 +23,7 @@ struct LauncherViewEvents
     std::function<void()> onExitClicked;
     std::function<void()> onMinimizeClicked;
     std::function<void(const std::string& url)> onLinkClicked;
+    std::function<void(const std::string& account, const std::string& password, bool saveAccount)> onConnectClicked;
 };
 
 class LauncherView
@@ -41,6 +42,9 @@ public:
 
     bool ShouldClose() const noexcept { return shouldClose_; }
     void RequestClose() noexcept { shouldClose_ = true; }
+
+    void SetSavedAccount(const std::string& account, bool remember = true) noexcept;
+    void SetAuthError(const std::string& error) noexcept { authErrorText_ = error; }
 
 private:
     bool ModernButton(
@@ -75,7 +79,19 @@ private:
         float rounding = 4.0f,
         bool showPercentage = false) noexcept;
 
+    void RenderLoginForm(
+        float bottomCardY,
+        const ImVec2& winSize,
+        const LauncherViewEvents& events) noexcept;
+
     bool shouldClose_ = false;
+    bool showLoginForm_ = false;
+    float loginFormAnim_ = 0.0f;
+    char accountBuffer_[64] = { 0 };
+    char passwordBuffer_[64] = { 0 };
+    bool rememberAccount_ = true;
+    std::string authErrorText_;
+
     ImFont* fontSmall_ = nullptr;
     ImFont* fontRegular_ = nullptr;
     ImFont* fontBold_ = nullptr;

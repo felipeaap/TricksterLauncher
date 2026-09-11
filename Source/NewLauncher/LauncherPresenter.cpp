@@ -98,6 +98,10 @@ LauncherViewEvents LauncherPresenter::CreateViewEvents() noexcept
 {
     LauncherViewEvents events;
     events.onPlayClicked = [this]() { OnPlay(); };
+    events.onConnectClicked = [this](const std::string& account, const std::string& password, bool saveAccount)
+    {
+        OnConnect(account, password, saveAccount);
+    };
     events.onCheckClicked = [this]() { OnCheckFiles(); };
     events.onOptionClicked = [this]() { OnOption(); };
     events.onExitClicked = [this]() { OnExit(); };
@@ -107,9 +111,18 @@ LauncherViewEvents LauncherPresenter::CreateViewEvents() noexcept
 
 void LauncherPresenter::OnPlay() noexcept
 {
+    // Game start clicked - View will transition to login form
+}
+
+void LauncherPresenter::OnConnect(
+    const std::string& account,
+    const std::string& password,
+    bool saveAccount) noexcept
+{
+    (void)saveAccount;
     if (isWorkerDone_.load(std::memory_order_acquire) && !isMaintenance_)
     {
-        LaunchGame();
+        LaunchGame(account, password);
     }
 }
 
@@ -144,12 +157,14 @@ void LauncherPresenter::OnOpenLink(const std::string& url) noexcept
     }
 }
 
-void LauncherPresenter::LaunchGame()
+void LauncherPresenter::LaunchGame(const std::string& account, const std::string& password)
 {
     GameLauncher::Options options;
     options.injectDll = config::IsDllInjectEnable;
     options.dllPath = config::InjectDLLName;
     options.injectionDelayMilliseconds = 2000;
+    options.account = account;
+    options.password = password;
 
     GameLauncher launcher(options);
     if (launcher.Launch(GetGamePath()))

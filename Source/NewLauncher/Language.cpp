@@ -21,6 +21,11 @@ namespace lang
         {"launcher_filelist_building",   "Creating update list..."},
         {"launcher_setup_fail",          "Failed to open trickster settings!"},
         {"launcher_copy_fail",           "Failed to open the launcher!"},
+        {"launcher_login_account",       "Account ID"},
+        {"launcher_login_password",      "Password"},
+        {"launcher_login_connect",       "CONNECT"},
+        {"launcher_login_back",          "BACK"},
+        {"launcher_login_remember",      "Remember ID"},
     };
 }
 

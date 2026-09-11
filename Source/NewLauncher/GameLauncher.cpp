@@ -62,13 +62,30 @@ bool GameLauncher::Launch(const std::filesystem::path& launcherDirectory) const
     const std::filesystem::path gamePath = ResolveGamePath(launcherDirectory);
     const std::string executable = gamePath.string();
 
+    std::string cmdLine = "\"" + executable + "\"";
+    if (!options_.commandLineArgs.empty())
+    {
+        cmdLine += " " + options_.commandLineArgs;
+    }
+    else if (!options_.account.empty())
+    {
+        cmdLine += " /account:" + options_.account;
+        if (!options_.password.empty())
+        {
+            cmdLine += " /password:" + options_.password;
+        }
+    }
+
+    std::vector<char> cmdBuffer(cmdLine.begin(), cmdLine.end());
+    cmdBuffer.push_back('\0');
+
     STARTUPINFOA startupInfo{};
     startupInfo.cb = sizeof(startupInfo);
     PROCESS_INFORMATION processInfo{};
 
     if (!CreateProcessA(
-            executable.c_str(),
             nullptr,
+            cmdBuffer.data(),
             nullptr,
             nullptr,
             FALSE,

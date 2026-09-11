@@ -12,6 +12,9 @@ public:
         bool injectDll = false;
         std::string dllPath;
         DWORD injectionDelayMilliseconds = 2000;
+        std::string commandLineArgs;
+        std::string account;
+        std::string password;
     };
 
     explicit GameLauncher(Options options = {});
