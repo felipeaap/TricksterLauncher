@@ -167,8 +167,6 @@ bool LauncherView::ModernButton(
     else
     {
         // ── Secondary Floating White Pill Buttons (Check, Options, Exit) ──
-        const bool isExit = (accentColor == IM_COL32(239, 68, 68, 255));
-
         // Soft ambient card shadow
         dl->AddRectFilled(
             ImVec2(p0.x, p0.y + 1.0f),
@@ -176,25 +174,25 @@ bool LauncherView::ModernButton(
             IM_COL32(50, 80, 120, 35),
             rounding);
 
-        // Base fill & Crisp Border
+        // Base fill & Border with Trickster Orange Palette on hover
         ImU32 baseFill = IM_COL32(255, 255, 255, 255);
-        ImU32 borderCol = IM_COL32(148, 163, 184, 255); // #94a3b8 - Crisp clear border!
+        ImU32 borderCol = IM_COL32(148, 163, 184, 255); // #94a3b8 - Crisp clear border
 
         if (held)
         {
-            baseFill = isExit ? IM_COL32(254, 226, 226, 255) : IM_COL32(224, 242, 254, 255);
-            borderCol = isExit ? IM_COL32(248, 113, 113, 255) : IM_COL32(37, 99, 235, 255);
+            baseFill = IM_COL32(255, 237, 213, 255);  // #ffedd5 - Warm orange
+            borderCol = IM_COL32(234, 88, 12, 255);   // #ea580c - Deep Trickster Orange
         }
         else if (hovered)
         {
-            baseFill = isExit ? IM_COL32(255, 241, 242, 255) : IM_COL32(239, 246, 255, 255);
-            borderCol = isExit ? IM_COL32(225, 29, 72, 255) : IM_COL32(37, 99, 235, 255);
+            baseFill = IM_COL32(255, 247, 237, 255);  // #fff7ed - Soft warm orange tint
+            borderCol = IM_COL32(249, 115, 22, 255);  // #f97316 - Iconic Trickster Orange
         }
 
         dl->AddRectFilled(p0, p1, baseFill, rounding);
-        dl->AddRect(p0, p1, borderCol, rounding, 0, 1.3f);
+        dl->AddRect(p0, p1, borderCol, rounding, 0, hovered ? 1.5f : 1.3f);
 
-        // Typography (Deep Navy with high contrast and legibility)
+        // Typography (Deep Navy normal, Vibrant Trickster Orange on hover)
         if (label && *label)
         {
             ImVec2 textSize = ImGui::CalcTextSize(label);
@@ -203,9 +201,9 @@ bool LauncherView::ModernButton(
                 p0.x + (size.x - textSize.x) * 0.5f,
                 p0.y + (size.y - textSize.y) * 0.5f + yOffset);
 
-            ImU32 textCol = isExit && hovered
-                ? IM_COL32(225, 29, 72, 255)
-                : IM_COL32(15, 23, 42, 255); // #0f172a - High contrast bold text!
+            ImU32 textCol = hovered
+                ? IM_COL32(234, 88, 12, 255)          // #ea580c - Vibrant Trickster Orange!
+                : IM_COL32(15, 23, 42, 255);          // #0f172a - High contrast dark navy!
 
             dl->AddText(textPos, textCol, label);
         }
@@ -669,8 +667,7 @@ void LauncherView::Render(
                 "##btn_exit",
                 lang::GetString("launcher_exit").c_str(),
                 ImVec2(btnW, btnH),
-                false,
-                IM_COL32(239, 68, 68, 255)))
+                false))
         {
             if (events.onExitClicked)
                 events.onExitClicked();
