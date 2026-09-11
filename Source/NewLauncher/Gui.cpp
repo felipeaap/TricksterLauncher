@@ -363,15 +363,7 @@ void CreateImGui() noexcept
     {
         s_helper = new Helper();
         std::string maintenanceCheck = s_helper->GetFileFromURL(0);
-        if (maintenanceCheck.empty())
-        {
-            MessageBoxA(nullptr, "Error!", nullptr, MB_OK);
-            PostQuitMessage(0);
-        }
-        else
-        {
-            s_helper->isMaintenance = (maintenanceCheck == "true");
-        }
+        s_helper->isMaintenance = (maintenanceCheck == "true");
     }
 
     InitFonts();

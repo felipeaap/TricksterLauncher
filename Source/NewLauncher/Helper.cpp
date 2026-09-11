@@ -265,24 +265,12 @@ void Helper::UpdateLauncher()
     const std::string remoteLauncherHash = GetFileFromURL(1);
     if (remoteLauncherHash.empty())
     {
-        MessageBoxA(nullptr,
-                    lang::GetString("launcher_update_check_fail").c_str(),
-                    "Error!",
-                    MB_OK);
-        PostQuitMessage(0);
         return;
     }
 
-    if (!updater.Update(
-            launcherPath,
-            remoteLauncherHash,
-            launcherName,
-            currentExe))
-    {
-        MessageBoxA(nullptr,
-                    lang::GetString("launcher_update_download_fail").c_str(),
-                    "Error!",
-                    MB_OK);
-        PostQuitMessage(0);
-    }
+    updater.Update(
+        launcherPath,
+        remoteLauncherHash,
+        launcherName,
+        currentExe);
 }
