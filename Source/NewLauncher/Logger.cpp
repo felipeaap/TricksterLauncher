@@ -15,8 +15,25 @@ namespace Logger
 {
 namespace
 {
-    std::mutex   s_mutex;
+    std::mutex    s_mutex;
     std::ofstream s_logFile;
+    std::string   s_logPath;
+    constexpr uintmax_t kMaxLogSizeBytes = 2 * 1024 * 1024; // 2 MB
+
+    void RotateLogIfNeeded(const std::string& path) noexcept
+    {
+        try
+        {
+            std::error_code ec;
+            if (std::filesystem::exists(path, ec) && std::filesystem::file_size(path, ec) >= kMaxLogSizeBytes)
+            {
+                const std::filesystem::path oldPath = path + ".old";
+                std::filesystem::remove(oldPath, ec);
+                std::filesystem::rename(path, oldPath, ec);
+            }
+        }
+        catch (...) {}
+    }
 
     std::string Timestamp() noexcept
     {
@@ -38,6 +55,19 @@ namespace
         try
         {
             std::lock_guard<std::mutex> lk(s_mutex);
+
+            if (s_logFile.is_open() && !s_logPath.empty())
+            {
+                // Check if current log stream exceeds max size during runtime
+                s_logFile.seekp(0, std::ios::end);
+                if (s_logFile.tellp() >= static_cast<std::streampos>(kMaxLogSizeBytes))
+                {
+                    s_logFile.close();
+                    RotateLogIfNeeded(s_logPath);
+                    s_logFile.open(s_logPath, std::ios::app);
+                }
+            }
+
             const std::string line = "[" + Timestamp() + "] [" + level + "] " + msg + "\n";
             if (s_logFile.is_open())
             {
@@ -62,6 +92,10 @@ void Init(const std::string& path) noexcept
         }
 
         std::lock_guard<std::mutex> lk(s_mutex);
+        s_logPath = path;
+
+        RotateLogIfNeeded(path);
+
         s_logFile.open(path, std::ios::app);
         if (s_logFile.is_open())
             s_logFile << "\n--- Launcher started ---\n";

@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "Config.h"
+#include "Language.h"
 
 namespace
 {
@@ -117,5 +118,36 @@ void RunConfigTests()
         std::filesystem::remove_all(tmpDir);
     }
 
-    std::cout << "[PASS] Config tests passed!" << std::endl;
+    // ── Test 7: Language (i18n) loading & fallback ─────────────────────────
+    {
+        const std::filesystem::path tmpDir =
+            std::filesystem::temp_directory_path() / "TricksterLauncherTests_Lang";
+        const std::filesystem::path langDir = tmpDir / "LauncherData" / "lang";
+        std::filesystem::create_directories(langDir);
+
+        const std::filesystem::path ptFile = langDir / "pt-br.json";
+        std::ofstream f(ptFile);
+        f << R"({ "launcher_game_start": "INICIAR JOGO", "launcher_options": "OPÇÕES" })";
+        f.close();
+
+        // Default before custom load
+        lang::Load(tmpDir.wstring(), "en-us");
+        assert(lang::GetString("launcher_game_start") == "GAME START");
+
+        // Load custom pt-br
+        bool loaded = lang::Load(tmpDir.wstring(), "pt-br");
+        assert(loaded == true);
+        assert(lang::GetString("launcher_game_start") == "INICIAR JOGO");
+        assert(lang::GetString("launcher_options") == "OPÇÕES");
+        // Fallback for unprovided key
+        assert(lang::GetString("launcher_exit") == "EXIT");
+
+        // Reset back to en-us
+        lang::Load(tmpDir.wstring(), "en-us");
+        assert(lang::GetString("launcher_game_start") == "GAME START");
+
+        std::filesystem::remove_all(tmpDir);
+    }
+
+    std::cout << "[PASS] Config and Language (i18n) tests passed!" << std::endl;
 }

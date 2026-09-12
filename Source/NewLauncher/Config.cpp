@@ -15,6 +15,7 @@ namespace config
     std::string OptionExecName          = "apps/Setup.exe";
     std::string GameExecName            = "Trickster/trickster.bin";
     std::string Region                  = "thailand";
+    std::string Language                = "en-us";
     bool IsCDNUsingSSL                  = false;
     std::string AuthEndpointURL         = "https://meuserver.com/endpoints/launcher_auth.php";
     std::string AuthToken               = "";
@@ -79,6 +80,7 @@ namespace config
             getString ("option_exec",   OptionExecName);
             getString ("game_exec",     GameExecName);
             getString ("region",        Region);
+            getString ("language",      Language);
             getBool   ("use_ssl",       IsCDNUsingSSL);
             getBool   ("manifest_require_signature", ManifestRequireSignature);
             getString ("manifest_public_key_pem",    ManifestPublicKeyPem);

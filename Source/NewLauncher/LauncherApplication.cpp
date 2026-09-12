@@ -77,7 +77,10 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
 
     // ── Config.json ─────────────────────────────────────────────────────────
     config::Load(folderPath);
-    Logger::Log("Config loaded (cdn=" + config::LauncherCDN + ")");
+    Logger::Log("Config loaded (cdn=" + config::LauncherCDN + ", lang=" + config::Language + ")");
+
+    // ── Language (i18n) ──────────────────────────────────────────────────────
+    lang::Load(folderPath, config::Language);
 
     // ── Admin check ─────────────────────────────────────────────────────────
     if (RequiresAdmin(folderPath))

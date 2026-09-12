@@ -1,8 +1,19 @@
 #include "Language.h"
 
+#include <filesystem>
+#include <fstream>
+#include <mutex>
+#include <shared_mutex>
+
+#include "json.hpp"
+
 namespace lang
 {
-    Dictionary Languages = 
+namespace
+{
+    std::shared_mutex s_langMutex;
+
+    const Dictionary kDefaultLanguages = 
     {
         {"splash_check",                 "Verifying file: "},
         {"launcher_waiting_server",      "Waiting for server response..."},
@@ -18,8 +29,8 @@ namespace lang
         {"launcher_site_desc",           "You can visit our website by"},
         {"launcher_site_click",          "CLICKING HERE"},
         {"launcher_update_launch_fail",  "Failed to launch the updated launcher."},
-		{"launcher_update_download_fail","Failed to download the updated launcher."},
-	    {"launcher_update_check_fail",   "Failed to check for launcher updates."},
+        {"launcher_update_download_fail","Failed to download the updated launcher."},
+        {"launcher_update_check_fail",   "Failed to check for launcher updates."},
         {"launcher_filelist_building",   "Creating update list..."},
         {"launcher_setup_fail",          "Failed to open trickster settings!"},
         {"launcher_copy_fail",           "Failed to open the launcher!"},
@@ -31,10 +42,75 @@ namespace lang
     };
 }
 
-std::string lang::GetString(const std::string& key) noexcept 
+Dictionary Languages = kDefaultLanguages;
+
+bool Load(const std::wstring& exeDir, const std::string& languageCode) noexcept
 {
-    auto it = Languages.find(key);
-    if (it != Languages.end())
-        return it->second;
+    try
+    {
+        std::unique_lock<std::shared_mutex> lock(s_langMutex);
+        Languages = kDefaultLanguages; // Reset to default base before loading
+
+        if (languageCode.empty() || languageCode == "en" || languageCode == "en-us")
+        {
+            // Already default English
+        }
+
+        const std::string langFile = languageCode + ".json";
+        const std::wstring wLangFile(langFile.begin(), langFile.end());
+
+        std::vector<std::filesystem::path> candidates;
+        if (!exeDir.empty())
+        {
+            candidates.push_back(std::filesystem::path(exeDir) / L"LauncherData" / L"lang" / wLangFile);
+            candidates.push_back(std::filesystem::path(exeDir) / L"lang" / wLangFile);
+            candidates.push_back(std::filesystem::path(exeDir) / wLangFile);
+        }
+        candidates.push_back(std::filesystem::path(L"LauncherData/lang") / wLangFile);
+        candidates.push_back(std::filesystem::path(L"lang") / wLangFile);
+        candidates.push_back(std::filesystem::path(wLangFile));
+
+        for (const auto& path : candidates)
+        {
+            std::error_code ec;
+            if (!std::filesystem::exists(path, ec))
+                continue;
+
+            std::ifstream file(path);
+            if (!file.is_open())
+                continue;
+
+            const auto j = nlohmann::json::parse(file, nullptr, /*allow_exceptions=*/false);
+            if (j.is_discarded() || !j.is_object())
+                continue;
+
+            for (auto it = j.begin(); it != j.end(); ++it)
+            {
+                if (it.value().is_string())
+                {
+                    Languages[it.key()] = it.value().get<std::string>();
+                }
+            }
+            return true;
+        }
+    }
+    catch (...) {}
+
+    return false;
+}
+
+std::string GetString(const std::string& key) noexcept 
+{
+    try
+    {
+        std::shared_lock<std::shared_mutex> lock(s_langMutex);
+        auto it = Languages.find(key);
+        if (it != Languages.end())
+            return it->second;
+    }
+    catch (...) {}
+
     return "";
 }
+
+} // namespace lang
