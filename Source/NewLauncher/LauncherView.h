@@ -82,6 +82,14 @@ private:
         float rounding = 4.0f,
         bool showPercentage = false) noexcept;
 
+    static void RenderTricksterProgressBar(
+        float fraction,
+        const ImVec2& size,
+        bool showGears = true,
+        bool showDrill = true,
+        bool showRulerNumbers = true,
+        ImFont* fontSmall = nullptr) noexcept;
+
     void RenderLoginForm(
         float bottomCardY,
         const ImVec2& winSize,

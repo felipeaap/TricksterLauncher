@@ -437,6 +437,389 @@ void LauncherView::RenderLink(
     ImGui::PopStyleColor();
 }
 
+static void RenderGear(
+    ImDrawList* dl,
+    const ImVec2& center,
+    float radius,
+    int teeth,
+    ImU32 bodyCol,
+    ImU32 borderCol,
+    ImU32 centerCol,
+    float angle) noexcept
+{
+    if (!dl || radius <= 2.0f) return;
+
+    const float toothDepth = radius * 0.35f;
+    const float innerR = radius - toothDepth;
+    const float holeR = innerR * 0.40f;
+    const float step = (3.14159265f * 2.0f) / static_cast<float>(teeth);
+
+    // Draw teeth & outer body using polyline and convex fill
+    std::vector<ImVec2> pts;
+    pts.reserve(teeth * 4);
+    for (int i = 0; i < teeth; ++i)
+    {
+        const float a0 = angle + i * step;
+        const float a1 = a0 + step * 0.32f;
+        const float a2 = a0 + step * 0.50f;
+        const float a3 = a0 + step * 0.82f;
+
+        pts.push_back(ImVec2(center.x + cosf(a0) * radius, center.y + sinf(a0) * radius));
+        pts.push_back(ImVec2(center.x + cosf(a1) * radius, center.y + sinf(a1) * radius));
+        pts.push_back(ImVec2(center.x + cosf(a2) * innerR, center.y + sinf(a2) * innerR));
+        pts.push_back(ImVec2(center.x + cosf(a3) * innerR, center.y + sinf(a3) * innerR));
+    }
+
+    if (!pts.empty())
+    {
+        dl->AddConvexPolyFilled(pts.data(), static_cast<int>(pts.size()), bodyCol);
+        dl->AddPolyline(pts.data(), static_cast<int>(pts.size()), borderCol, ImDrawFlags_Closed, 1.2f);
+    }
+
+    // Inner core
+    dl->AddCircleFilled(center, innerR * 0.70f, bodyCol);
+    dl->AddCircle(center, innerR * 0.70f, borderCol, 12, 1.0f);
+
+    // Axle hole
+    dl->AddCircleFilled(center, holeR, centerCol);
+    dl->AddCircle(center, holeR, borderCol, 8, 1.0f);
+}
+
+static void RenderSparkleStar(ImDrawList* dl, ImVec2 pos, float size, ImU32 color, float alpha) noexcept
+{
+    if (!dl || size <= 0.0f) return;
+    const int r = (color >> IM_COL32_R_SHIFT) & 0xFF;
+    const int g = (color >> IM_COL32_G_SHIFT) & 0xFF;
+    const int b = (color >> IM_COL32_B_SHIFT) & 0xFF;
+    const ImU32 c = IM_COL32(r, g, b, static_cast<int>(alpha * 255.0f));
+
+    // 4-point diamond star
+    const ImVec2 pT(pos.x, pos.y - size);
+    const ImVec2 pR(pos.x + size * 0.55f, pos.y);
+    const ImVec2 pB(pos.x, pos.y + size);
+    const ImVec2 pL(pos.x - size * 0.55f, pos.y);
+
+    dl->AddQuadFilled(pT, pR, pB, pL, c);
+    dl->AddCircleFilled(pos, size * 0.25f, IM_COL32(255, 255, 255, static_cast<int>(alpha * 255.0f)));
+}
+
+static void RenderMascotDrillIndicator(
+    ImDrawList* dl,
+    const ImVec2& tipPos,
+    float time,
+    bool isDownloading) noexcept
+{
+    if (!dl) return;
+
+    // Drilling vibration jitter while active
+    const float jitterY = isDownloading ? (sinf(time * 35.0f) * 0.7f) : 0.0f;
+    const float jitterX = isDownloading ? (cosf(time * 28.0f) * 0.35f) : 0.0f;
+    const ImVec2 baseTip(tipPos.x + jitterX, tipPos.y + jitterY);
+
+    // 1. Floating sparkling stars around the mascot (Cyan, Gold, Pink, White)
+    const float s1Alpha = sinf(time * 6.0f) * 0.35f + 0.65f;
+    const float s2Alpha = cosf(time * 5.0f + 1.2f) * 0.35f + 0.65f;
+    const float s3Alpha = sinf(time * 7.0f + 2.5f) * 0.35f + 0.65f;
+
+    RenderSparkleStar(dl, ImVec2(baseTip.x - 14.0f, baseTip.y - 22.0f + sinf(time * 3.0f) * 2.0f), 4.5f, IM_COL32(56, 189, 248, 255), s1Alpha);
+    RenderSparkleStar(dl, ImVec2(baseTip.x + 14.0f, baseTip.y - 24.0f + cosf(time * 3.5f) * 2.0f), 4.0f, IM_COL32(251, 191, 36, 255), s2Alpha);
+    RenderSparkleStar(dl, ImVec2(baseTip.x - 16.0f, baseTip.y - 10.0f + sinf(time * 4.0f) * 1.5f), 3.5f, IM_COL32(244, 114, 182, 255), s3Alpha);
+    RenderSparkleStar(dl, ImVec2(baseTip.x + 16.0f, baseTip.y - 12.0f + cosf(time * 4.5f) * 1.5f), 3.5f, IM_COL32(255, 255, 255, 255), s1Alpha);
+
+    // 2. Metallic Spiral Drill Bit pointing directly at tipPos
+    const ImVec2 bitTip(baseTip.x, baseTip.y + 1.0f);
+    const ImVec2 bitL(baseTip.x - 5.5f, baseTip.y - 11.0f);
+    const ImVec2 bitR(baseTip.x + 5.5f, baseTip.y - 11.0f);
+
+    // Drill cone fill & border
+    dl->AddTriangleFilled(bitTip, bitL, bitR, IM_COL32(226, 232, 240, 255));
+    dl->AddTriangle(bitTip, bitL, bitR, IM_COL32(51, 65, 85, 255), 1.2f);
+
+    // Spiral groove lines across the drill bit
+    const float spiralPhase = fmodf(time * 12.0f, 1.0f);
+    for (int i = 0; i < 3; ++i)
+    {
+        const float tY = (static_cast<float>(i) + spiralPhase) / 3.0f;
+        if (tY >= 0.15f && tY <= 0.90f)
+        {
+            const float y = baseTip.y - tY * 10.0f;
+            const float w = (1.0f - tY) * 4.5f + 1.0f;
+            dl->AddLine(
+                ImVec2(baseTip.x - w, y),
+                ImVec2(baseTip.x + w, y - 1.5f),
+                IM_COL32(71, 85, 105, 255),
+                1.2f);
+        }
+    }
+
+    // 3. Drill Motor / Head Unit (Cute golden-tan unit with grips)
+    const ImVec2 unitP0(baseTip.x - 7.5f, baseTip.y - 20.0f);
+    const ImVec2 unitP1(baseTip.x + 7.5f, baseTip.y - 11.0f);
+
+    dl->AddRectFilled(
+        ImVec2(unitP0.x, unitP0.y + 1.0f),
+        ImVec2(unitP1.x, unitP1.y + 1.0f),
+        IM_COL32(0, 0, 0, 50),
+        4.0f);
+    dl->AddRectFilled(unitP0, unitP1, IM_COL32(254, 240, 138, 255), 4.0f);
+    dl->AddRect(unitP0, unitP1, IM_COL32(161, 98, 7, 255), 4.0f, 0, 1.2f);
+
+    // Drill cute side handles
+    dl->AddCircleFilled(ImVec2(unitP0.x - 1.5f, baseTip.y - 15.5f), 2.5f, IM_COL32(180, 83, 9, 255));
+    dl->AddCircleFilled(ImVec2(unitP1.x + 1.5f, baseTip.y - 15.5f), 2.5f, IM_COL32(180, 83, 9, 255));
+
+    // 4. Mascot Character (Blonde hair with animal ears holding the drill)
+    const ImVec2 headCenter(baseTip.x, baseTip.y - 26.0f);
+
+    // Animal ears (cat/bunny ears)
+    dl->AddTriangleFilled(
+        ImVec2(headCenter.x - 7.0f, headCenter.y - 4.0f),
+        ImVec2(headCenter.x - 5.0f, headCenter.y - 12.0f),
+        ImVec2(headCenter.x - 1.5f, headCenter.y - 6.0f),
+        IM_COL32(146, 64, 14, 255));
+    dl->AddTriangleFilled(
+        ImVec2(headCenter.x + 1.5f, headCenter.y - 6.0f),
+        ImVec2(headCenter.x + 5.0f, headCenter.y - 12.0f),
+        ImVec2(headCenter.x + 7.0f, headCenter.y - 4.0f),
+        IM_COL32(146, 64, 14, 255));
+    dl->AddTriangleFilled(
+        ImVec2(headCenter.x - 5.5f, headCenter.y - 5.0f),
+        ImVec2(headCenter.x - 5.0f, headCenter.y - 10.0f),
+        ImVec2(headCenter.x - 2.5f, headCenter.y - 6.0f),
+        IM_COL32(244, 114, 182, 255));
+    dl->AddTriangleFilled(
+        ImVec2(headCenter.x + 2.5f, headCenter.y - 6.0f),
+        ImVec2(headCenter.x + 5.0f, headCenter.y - 10.0f),
+        ImVec2(headCenter.x + 5.5f, headCenter.y - 5.0f),
+        IM_COL32(244, 114, 182, 255));
+
+    // Blonde Hair Back & Face
+    dl->AddCircleFilled(headCenter, 6.5f, IM_COL32(253, 224, 71, 255)); // Bright yellow hair
+    dl->AddCircleFilled(ImVec2(headCenter.x, headCenter.y + 1.0f), 5.0f, IM_COL32(254, 226, 226, 255)); // Skin tone
+    dl->AddCircle(headCenter, 6.5f, IM_COL32(180, 83, 9, 255), 12, 1.0f);
+
+    // Front Hair Bangs
+    dl->AddTriangleFilled(
+        ImVec2(headCenter.x - 5.0f, headCenter.y - 3.0f),
+        ImVec2(headCenter.x - 2.0f, headCenter.y - 1.0f),
+        ImVec2(headCenter.x - 1.0f, headCenter.y - 5.0f),
+        IM_COL32(253, 224, 71, 255));
+    dl->AddTriangleFilled(
+        ImVec2(headCenter.x + 1.0f, headCenter.y - 5.0f),
+        ImVec2(headCenter.x + 2.0f, headCenter.y - 1.0f),
+        ImVec2(headCenter.x + 5.0f, headCenter.y - 3.0f),
+        IM_COL32(253, 224, 71, 255));
+
+    // Cute Anime Eyes & Blush
+    dl->AddCircleFilled(ImVec2(headCenter.x - 2.2f, headCenter.y + 0.5f), 1.0f, IM_COL32(69, 26, 3, 255));
+    dl->AddCircleFilled(ImVec2(headCenter.x + 2.2f, headCenter.y + 0.5f), 1.0f, IM_COL32(69, 26, 3, 255));
+    dl->AddCircleFilled(ImVec2(headCenter.x - 3.5f, headCenter.y + 2.2f), 1.2f, IM_COL32(244, 114, 182, 180)); // Left blush
+    dl->AddCircleFilled(ImVec2(headCenter.x + 3.5f, headCenter.y + 2.2f), 1.2f, IM_COL32(244, 114, 182, 180)); // Right blush
+    // Cute smile
+    dl->AddLine(ImVec2(headCenter.x - 1.0f, headCenter.y + 3.0f), ImVec2(headCenter.x + 1.0f, headCenter.y + 3.0f), IM_COL32(180, 83, 9, 255), 1.0f);
+}
+
+void LauncherView::RenderTricksterProgressBar(
+    float fraction,
+    const ImVec2& size,
+    bool showGears,
+    bool showDrill,
+    bool showRulerNumbers,
+    ImFont* fontSmall) noexcept
+{
+    ImVec2 p0 = ImGui::GetCursorScreenPos();
+    ImVec2 p1 = ImVec2(p0.x + size.x, p0.y + size.y);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const float t = static_cast<float>(ImGui::GetTime());
+
+    // 1. Tactile shadow behind track
+    dl->AddRectFilled(
+        ImVec2(p0.x + 1.0f, p0.y + 1.5f),
+        ImVec2(p1.x + 1.0f, p1.y + 1.5f),
+        IM_COL32(0, 0, 0, 40),
+        2.0f);
+
+    // 2. Base Checkered Retro Gauge Background Track
+    dl->AddRectFilled(p0, p1, IM_COL32(100, 116, 139, 200), 2.0f); // Slate-500
+
+    // Draw subtle 3x3 checkered pixel grid
+    dl->PushClipRect(p0, p1, true);
+    const int checkSize = 3;
+    const int numX = static_cast<int>(size.x) / checkSize + 1;
+    const int numY = static_cast<int>(size.y) / checkSize + 1;
+    for (int y = 0; y < numY; ++y)
+    {
+        for (int x = 0; x < numX; ++x)
+        {
+            if ((x + y) % 2 == 0)
+            {
+                dl->AddRectFilled(
+                    ImVec2(p0.x + x * checkSize, p0.y + y * checkSize),
+                    ImVec2(p0.x + (x + 1) * checkSize, p0.y + (y + 1) * checkSize),
+                    IM_COL32(148, 163, 184, 120)); // Light tile
+            }
+        }
+    }
+
+    // 3. Ruler / Gauge Scale Numbers & Tick Marks (10, 20, 30, ... 100)
+    if (showRulerNumbers && size.y >= 13.0f)
+    {
+        if (fontSmall) ImGui::PushFont(fontSmall);
+        for (int pct = 10; pct <= 100; pct += 10)
+        {
+            const float markX = p0.x + size.x * (static_cast<float>(pct) / 100.0f);
+            // Top and bottom tick markers
+            dl->AddLine(
+                ImVec2(markX, p0.y + 1.0f),
+                ImVec2(markX, p0.y + 3.0f),
+                IM_COL32(255, 255, 255, 150),
+                1.0f);
+            dl->AddLine(
+                ImVec2(markX, p1.y - 3.0f),
+                ImVec2(markX, p1.y - 1.0f),
+                IM_COL32(255, 255, 255, 150),
+                1.0f);
+
+            // Scale number text (e.g. 70, 80, 90, 100)
+            if (pct >= 50 || size.x > 300.0f)
+            {
+                char numStr[8]{};
+                snprintf(numStr, sizeof(numStr), "%d", pct);
+                ImVec2 numSize = ImGui::CalcTextSize(numStr);
+                const float textX = markX - numSize.x * 0.5f;
+                const float textY = p0.y + (size.y - numSize.y) * 0.5f;
+
+                dl->AddText(ImVec2(textX + 0.5f, textY + 0.5f), IM_COL32(15, 23, 42, 160), numStr);
+                dl->AddText(ImVec2(textX, textY), IM_COL32(241, 245, 249, 210), numStr);
+            }
+        }
+        if (fontSmall) ImGui::PopFont();
+    }
+
+    dl->PopClipRect();
+
+    // 4. Solid Bright Golden-Yellow Fill Bar
+    const float f = (std::clamp)(fraction, 0.0f, 1.0f);
+    const float pad = 1.0f;
+    const ImVec2 barP0 = ImVec2(p0.x + pad, p0.y + pad);
+    const float maxBarW = size.x - pad * 2.0f;
+    const float barH = size.y - pad * 2.0f;
+    const float barW = maxBarW * f;
+
+    if (barW >= 1.0f)
+    {
+        const ImVec2 barP1 = ImVec2(barP0.x + barW, barP0.y + barH);
+
+        // Gradient Golden Yellow Fill (#FFEB3B / #FFC107 / #F57F17)
+        const ImU32 colTop = IM_COL32(255, 241, 118, 255);    // #fff176 Bright gold
+        const ImU32 colMid = IM_COL32(255, 214, 0, 255);      // #ffd600 Rich Trickster yellow
+        const ImU32 colBottom = IM_COL32(245, 158, 11, 255);  // #f59e0b Warm amber
+
+        // Top half fill
+        dl->AddRectFilledMultiColor(
+            barP0,
+            ImVec2(barP1.x, barP0.y + barH * 0.5f),
+            colTop, colTop, colMid, colMid);
+
+        // Bottom half fill
+        dl->AddRectFilledMultiColor(
+            ImVec2(barP0.x, barP0.y + barH * 0.5f),
+            barP1,
+            colMid, colMid, colBottom, colBottom);
+
+        // Crisp Top Specular Sheen (White/Gold Highlight)
+        dl->AddLine(
+            ImVec2(barP0.x, barP0.y + 0.5f),
+            ImVec2(barP1.x, barP0.y + 0.5f),
+            IM_COL32(255, 255, 255, 230),
+            1.0f);
+
+        // Bottom Edge Bevel (Dark Amber)
+        dl->AddLine(
+            ImVec2(barP0.x, barP1.y - 0.5f),
+            ImVec2(barP1.x, barP1.y - 0.5f),
+            IM_COL32(217, 119, 6, 255),
+            1.0f);
+
+        // Animated diagonal sweep reflection
+        dl->PushClipRect(barP0, barP1, true);
+        const float skewX = barH * 0.7f;
+        const float sweepPhase = fmodf(t * 1.15f, 2.0f) - 0.5f;
+        const float sweepCenter = barP0.x + (maxBarW + skewX * 2.0f) * sweepPhase - skewX;
+
+        dl->AddQuadFilled(
+            ImVec2(sweepCenter + skewX - 16.0f, barP0.y),
+            ImVec2(sweepCenter + skewX + 16.0f, barP0.y),
+            ImVec2(sweepCenter - skewX + 16.0f, barP1.y),
+            ImVec2(sweepCenter - skewX - 16.0f, barP1.y),
+            IM_COL32(255, 255, 255, 75));
+
+        dl->PopClipRect();
+
+        // Right edge dividing border of the fill
+        dl->AddLine(
+            ImVec2(barP1.x - 0.5f, barP0.y),
+            ImVec2(barP1.x - 0.5f, barP1.y),
+            IM_COL32(217, 119, 6, 255),
+            1.0f);
+    }
+
+    // 5. Outer Beveled White / Crisp Border
+    dl->AddRect(
+        p0,
+        p1,
+        IM_COL32(255, 255, 255, 255),
+        2.0f,
+        0,
+        1.5f);
+    dl->AddRect(
+        ImVec2(p0.x - 1.0f, p0.y - 1.0f),
+        ImVec2(p1.x + 1.0f, p1.y + 1.0f),
+        IM_COL32(71, 85, 105, 170),
+        2.5f,
+        0,
+        1.0f);
+
+    // 6. Spinning Gears at Origin (Left side)
+    if (showGears)
+    {
+        const bool isBusy = (f > 0.001f && f < 0.999f);
+        const float gearSpeed = isBusy ? 2.5f : 0.6f;
+
+        // Upper Orange Gear (overlapping top-left)
+        RenderGear(
+            dl,
+            ImVec2(p0.x + 2.0f, p0.y + 1.0f),
+            8.5f,
+            7,
+            IM_COL32(249, 115, 22, 255), // #f97316 Orange
+            IM_COL32(194, 65, 12, 255),  // #c2410c Dark orange border
+            IM_COL32(255, 237, 213, 255),// #ffedd5 Axle center
+            t * gearSpeed);
+
+        // Lower Lime Green Gear (overlapping bottom-left)
+        RenderGear(
+            dl,
+            ImVec2(p0.x - 4.0f, p0.y + size.y - 1.0f),
+            7.5f,
+            6,
+            IM_COL32(132, 204, 22, 255), // #84cc16 Lime
+            IM_COL32(77, 124, 15, 255),  // #4d7c0f Dark lime border
+            IM_COL32(236, 252, 203, 255),// #ecfccb Axle center
+            -t * (gearSpeed * 1.2f));
+    }
+
+    // 7. Mascot Drill Indicator at the Leading Edge (barP1.x)
+    if (showDrill && barW >= 2.0f)
+    {
+        const bool isDownloading = (f > 0.001f && f < 0.999f);
+        const ImVec2 tipPos(barP0.x + barW, p0.y);
+        RenderMascotDrillIndicator(dl, tipPos, t, isDownloading);
+    }
+
+    ImGui::Dummy(size);
+}
+
 void LauncherView::RenderBeveledProgressBar(
     float fraction,
     const ImVec2& size,
@@ -448,112 +831,8 @@ void LauncherView::RenderBeveledProgressBar(
     float rounding,
     bool showPercentage) noexcept
 {
-    ImVec2 p0 = ImGui::GetCursorScreenPos();
-    ImVec2 p1 = ImVec2(p0.x + size.x, p0.y + size.y);
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-
-    const float pillRounding = (std::min)(size.y * 0.5f, rounding);
-
-    // 1. Light Sky-Blue Sunken Capsule Track
-    dl->AddRectFilled(
-        ImVec2(p0.x - 0.5f, p0.y - 0.5f),
-        ImVec2(p1.x + 0.5f, p1.y + 0.5f),
-        IM_COL32(203, 213, 225, 120),
-        pillRounding + 0.5f);
-    dl->AddRectFilled(p0, p1, IM_COL32(224, 242, 254, 240), pillRounding); // #e0f2fe
-
-    // Subtle track border
-    dl->AddRect(p0, p1, IM_COL32(147, 197, 253, 240), pillRounding, 0, 1.0f); // #93c5fd
-
-    // 2. Filled Progress Capsule
-    const float f = (std::clamp)(fraction, 0.0f, 1.0f);
-    const float pad = 1.0f;
-    const ImVec2 barP0 = ImVec2(p0.x + pad, p0.y + pad);
-    const float maxBarW = size.x - pad * 2.0f;
-    const float barH = size.y - pad * 2.0f;
-    const float barW = maxBarW * f;
-
-    if (barW >= 2.0f)
-    {
-        const ImVec2 barP1 = ImVec2(barP0.x + barW, barP0.y + barH);
-        const float barRounding = (std::min)(pillRounding - 0.5f, barW * 0.5f);
-        const ImDrawFlags cornerFlags = (barW >= maxBarW - 1.0f)
-            ? ImDrawFlags_RoundCornersAll
-            : ImDrawFlags_RoundCornersLeft;
-
-        // Base Gradient Fill (Royal Blue & Cerulean)
-        dl->AddRectFilledMultiColor(barP0, barP1, colTop, colTop, colBottom, colBottom);
-
-        // Soft Layered Top Sheen
-        const ImDrawFlags topCornerFlags = (cornerFlags & ImDrawFlags_RoundCornersLeft)
-            ? (ImDrawFlags_RoundCornersTopLeft | (barW >= maxBarW - 1.0f ? ImDrawFlags_RoundCornersTopRight : 0))
-            : ImDrawFlags_None;
-
-        dl->AddRectFilled(
-            barP0,
-            ImVec2(barP1.x, barP0.y + barH * 0.5f),
-            IM_COL32(255, 255, 255, 75),
-            barRounding,
-            topCornerFlags);
-
-        // Animated diagonal wave shimmer gliding across
-        const float t = static_cast<float>(ImGui::GetTime());
-        const float skewX = barH * 0.75f;
-        const float shimmerPhase = fmodf(t * 1.15f, 1.8f) - 0.4f;
-        const float shimmerCenter = barP0.x + (maxBarW + skewX * 2.0f) * shimmerPhase - skewX;
-        const float shimmerWidth = 24.0f;
-        const float coreWidth = 10.0f;
-
-        dl->PushClipRect(barP0, barP1, true);
-
-        // Soft outer diagonal beam
-        dl->AddQuadFilled(
-            ImVec2(shimmerCenter + skewX - shimmerWidth * 0.5f, barP0.y),
-            ImVec2(shimmerCenter + skewX + shimmerWidth * 0.5f, barP0.y),
-            ImVec2(shimmerCenter - skewX + shimmerWidth * 0.5f, barP1.y),
-            ImVec2(shimmerCenter - skewX - shimmerWidth * 0.5f, barP1.y),
-            IM_COL32(255, 255, 255, 60));
-
-        // Bright inner diagonal core beam
-        dl->AddQuadFilled(
-            ImVec2(shimmerCenter + skewX - coreWidth * 0.5f, barP0.y),
-            ImVec2(shimmerCenter + skewX + coreWidth * 0.5f, barP0.y),
-            ImVec2(shimmerCenter - skewX + coreWidth * 0.5f, barP1.y),
-            ImVec2(shimmerCenter - skewX - coreWidth * 0.5f, barP1.y),
-            IM_COL32(255, 255, 255, 110));
-
-        dl->PopClipRect();
-
-        // Soft pulse on the leading edge
-        if (f > 0.02f && f < 0.999f)
-        {
-            const float pulseAlpha = (sinf(t * 5.0f) * 0.5f + 0.5f) * 50.0f + 30.0f;
-            dl->AddRectFilled(
-                ImVec2(barP1.x - 3.0f, barP0.y),
-                barP1,
-                IM_COL32(255, 255, 255, static_cast<int>(pulseAlpha)),
-                barRounding,
-                cornerFlags);
-        }
-
-        // Fill border
-        dl->AddRect(barP0, barP1, colBorder, barRounding, cornerFlags, 1.0f);
-    }
-
-    if (showPercentage && size.y >= 12.0f)
-    {
-        char pctBuf[16]{};
-        snprintf(pctBuf, sizeof(pctBuf), "%d%%", static_cast<int>(f * 100.0f + 0.5f));
-        ImVec2 pctSize = ImGui::CalcTextSize(pctBuf);
-        ImVec2 pctPos = ImVec2(p0.x + (size.x - pctSize.x) * 0.5f, p0.y + (size.y - pctSize.y) * 0.5f);
-
-        // High contrast percentage with subtle shadow for perfect legibility
-        dl->AddText(ImVec2(pctPos.x + 0.5f, pctPos.y + 1.0f), IM_COL32(15, 23, 42, 180), pctBuf);
-        dl->AddText(pctPos, IM_COL32(255, 255, 255, 255), pctBuf);
-    }
-
-    // Advance ImGui cursor
-    ImGui::Dummy(size);
+    // Redirect to the iconic Trickster Progress Bar
+    RenderTricksterProgressBar(fraction, size, false, false, showPercentage, nullptr);
 }
 
 void LauncherView::SetSavedAccount(const std::string& account, bool remember) noexcept
@@ -973,34 +1252,28 @@ void LauncherView::Render(
             }
 
             // Dual Progress Bars
-            // Progress bar 1: File progress (Soft Sky-Blue Capsule)
-            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 28));
-            RenderBeveledProgressBar(
+            // Progress bar 1: File progress (Golden-Yellow Mini Gauge)
+            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 24));
+            RenderTricksterProgressBar(
                 animFileProgress_,
                 ImVec2(348, 8),
-                IM_COL32(147, 197, 253, 255), // #93c5fd
-                IM_COL32(96, 165, 250, 255),  // #60a5fa
-                IM_COL32(255, 255, 255, 160),
-                IM_COL32(59, 130, 246, 100),
-                IM_COL32(37, 99, 235, 140),
-                4.0f,
-                false);
+                false,
+                false,
+                false,
+                nullptr);
 
-            // Progress bar 2: Total progress (Vibrant Cerulean/Royal Blue Capsule with Percentage)
-            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 40));
-            RenderBeveledProgressBar(
+            // Progress bar 2: Total progress (Iconic Trickster Gauge with Gears, Ruler Scale & Drilling Mascot)
+            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 36));
+            RenderTricksterProgressBar(
                 animTotalProgress_,
-                ImVec2(348, 14),
-                IM_COL32(56, 189, 248, 255),  // #38bdf8
-                IM_COL32(37, 99, 235, 255),   // #2563eb
-                IM_COL32(255, 255, 255, 180),
-                IM_COL32(29, 78, 216, 120),
-                IM_COL32(30, 64, 175, 150),
-                7.0f,
-                true);
+                ImVec2(348, 18),
+                true,
+                true,
+                true,
+                fontSmall_);
 
             // Primary Action: Big Game Start Button (Transitions to Login Form on click)
-            ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 32));
+            ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 30));
             const bool gameLocked = !state.isGameEnabled;
             if (fontLarge_) ImGui::PushFont(fontLarge_);
             if (ModernButton(
