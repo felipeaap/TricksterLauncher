@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <mutex>
@@ -53,6 +54,13 @@ void Init(const std::string& path) noexcept
 {
     try
     {
+        std::error_code ec;
+        const auto parent = std::filesystem::path(path).parent_path();
+        if (!parent.empty())
+        {
+            std::filesystem::create_directories(parent, ec);
+        }
+
         std::lock_guard<std::mutex> lk(s_mutex);
         s_logFile.open(path, std::ios::app);
         if (s_logFile.is_open())

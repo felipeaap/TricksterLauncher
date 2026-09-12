@@ -133,6 +133,7 @@
     <ClCompile Include="..\Source\NewLauncher\LauncherState.cpp" />
     <ClCompile Include="..\Source\NewLauncher\Config.cpp" />
     <ClCompile Include="..\Source\NewLauncher\Logger.cpp" />
+    <ClCompile Include="..\Source\NewLauncher\VersionManager.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

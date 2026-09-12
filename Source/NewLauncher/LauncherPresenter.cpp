@@ -255,6 +255,13 @@ void LauncherPresenter::CheckSelfUpdate()
 
     // Clean leftover backup/temp files from previous updater runs
     std::error_code ec;
+    const std::filesystem::path downloadsDir = launcherPath.parent_path() / "LauncherData" / "downloads";
+    std::filesystem::create_directories(downloadsDir, ec); ec.clear();
+    std::filesystem::remove(downloadsDir / (launcherName + ".new"), ec); ec.clear();
+    std::filesystem::remove(downloadsDir / (launcherName + ".new.part"), ec); ec.clear();
+    std::filesystem::remove(downloadsDir / (launcherName + ".new.part.meta"), ec); ec.clear();
+    std::filesystem::remove(downloadsDir / (launcherName + ".backup"), ec); ec.clear();
+    std::filesystem::remove(downloadsDir / (launcherName + ".bak"), ec); ec.clear();
     std::filesystem::remove(launcherPath.string() + ".backup", ec); ec.clear();
     std::filesystem::remove(launcherPath.string() + ".bak", ec);    ec.clear();
     std::filesystem::remove(launcherPath.string() + ".new.part", ec); ec.clear();

@@ -25,11 +25,14 @@ bool LauncherUpdater::Update(const std::filesystem::path& launcherPath,
     if (localHash.empty() || localHash == remoteHash)
         return true;
 
-    const std::filesystem::path stagedPath = launcherPath.string() + ".new";
-    const std::filesystem::path updaterPath = launcherPath.parent_path() / "LauncherUpdater.exe";
-    const std::filesystem::path backupPath = launcherPath.string() + ".backup";
-
+    const std::filesystem::path downloadsDir = launcherPath.parent_path() / "LauncherData" / "downloads";
     std::error_code error;
+    std::filesystem::create_directories(downloadsDir, error);
+
+    const std::filesystem::path stagedPath = downloadsDir / (launcherPath.filename().string() + ".new");
+    const std::filesystem::path updaterPath = launcherPath.parent_path() / "LauncherUpdater.exe";
+    const std::filesystem::path backupPath = downloadsDir / (launcherPath.filename().string() + ".backup");
+
     std::filesystem::remove(stagedPath, error);
     std::filesystem::remove(stagedPath.string() + ".part", error);
     std::filesystem::remove(stagedPath.string() + ".part.meta", error);

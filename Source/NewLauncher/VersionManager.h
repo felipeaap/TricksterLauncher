@@ -3,6 +3,6 @@
 class VersionManager
 {
 public:
-    static int Load(const char* path = "version.dat", int defaultVersion = 1);
-    static bool Save(int version, const char* path = "version.dat");
+    static int Load(const char* path = "LauncherData/version.dat", int defaultVersion = 1);
+    static bool Save(int version, const char* path = "LauncherData/version.dat");
 };

@@ -70,7 +70,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     // ── Logger ──────────────────────────────────────────────────────────────
     {
         const std::filesystem::path logPath =
-            std::filesystem::path(folderPath) / L"launcher_error.log";
+            std::filesystem::path(folderPath) / L"LauncherData" / L"logs" / L"launcher_error.log";
         Logger::Init(logPath.string());
     }
     Logger::Log("LauncherApplication::Run started");

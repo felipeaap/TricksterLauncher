@@ -27,7 +27,8 @@ Output/
 CDN_Test/
 Release_Test/
 
-# NuGet
-packages/
-*.nupkg
+# Runtime / Launcher data
+version.dat
+LauncherData/
+test_subfolder/
 
