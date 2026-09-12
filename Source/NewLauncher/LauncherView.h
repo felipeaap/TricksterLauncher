@@ -48,6 +48,8 @@ public:
 
     void LoadHeroTexture(struct IDirect3DDevice9* device, const std::wstring& exeDir = L"") noexcept;
     void UnloadHeroTexture() noexcept;
+    void LoadDrillTexture(struct IDirect3DDevice9* device, const std::wstring& exeDir = L"") noexcept;
+    void UnloadDrillTexture() noexcept;
 
 private:
     bool ModernButton(
@@ -71,7 +73,7 @@ private:
         const char* url,
         const std::function<void(const std::string&)>& onClick) noexcept;
 
-    static void RenderBeveledProgressBar(
+    void RenderBeveledProgressBar(
         float fraction,
         const ImVec2& size,
         ImU32 colTop,
@@ -82,7 +84,7 @@ private:
         float rounding = 4.0f,
         bool showPercentage = false) noexcept;
 
-    static void RenderTricksterProgressBar(
+    void RenderTricksterProgressBar(
         float fraction,
         const ImVec2& size,
         bool showGears = true,
@@ -115,5 +117,8 @@ private:
     struct IDirect3DTexture9* heroTexture_ = nullptr;
     ImVec2 heroTexUvMin_{ 0.0f, 0.0f };
     ImVec2 heroTexUvMax_{ 1.0f, 1.0f };
+    struct IDirect3DTexture9* drillTexture_ = nullptr;
+    unsigned int drillTexW_ = 0;
+    unsigned int drillTexH_ = 0;
     std::wstring heroExeDir_;
 };

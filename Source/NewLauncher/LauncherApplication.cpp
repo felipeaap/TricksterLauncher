@@ -146,17 +146,20 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     ImGui_ImplDX9_Init(renderer.Device());
     Logger::Log("ImGui initialised");
 
-    // ── Hero Banner Texture ──────────────────────────────────────────────────
+    // ── Textures (Hero Banner & Drill Mascot) ────────────────────────────────
     launcherView.LoadHeroTexture(renderer.Device(), folderPath);
+    launcherView.LoadDrillTexture(renderer.Device(), folderPath);
 
     renderer.SetDeviceResetCallbacks(
         [&launcherView]()
         {
             launcherView.UnloadHeroTexture();
+            launcherView.UnloadDrillTexture();
         },
         [&launcherView, &renderer, folderPath]()
         {
             launcherView.LoadHeroTexture(renderer.Device(), folderPath);
+            launcherView.LoadDrillTexture(renderer.Device(), folderPath);
         });
 
     // ── Presenter ────────────────────────────────────────────────────────────
@@ -198,6 +201,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
 
     // ── Teardown ─────────────────────────────────────────────────────────────
     launcherView.UnloadHeroTexture();
+    launcherView.UnloadDrillTexture();
     presenter.Shutdown();
 
     ImGui_ImplDX9_Shutdown();

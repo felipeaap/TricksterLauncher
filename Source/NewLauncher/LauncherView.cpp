@@ -813,8 +813,53 @@ void LauncherView::RenderTricksterProgressBar(
     if (showDrill && barW >= 2.0f)
     {
         const bool isDownloading = (f > 0.001f && f < 0.999f);
-        const ImVec2 tipPos(barP0.x + barW, p0.y);
-        RenderMascotDrillIndicator(dl, tipPos, t, isDownloading);
+        const float jitterY = isDownloading ? (sinf(t * 35.0f) * 0.7f) : 0.0f;
+        const float jitterX = isDownloading ? (cosf(t * 28.0f) * 0.35f) : 0.0f;
+        const ImVec2 tipPos(barP0.x + barW + jitterX, p0.y + jitterY);
+
+        // Sparkles floating around
+        const float s1Alpha = sinf(t * 6.0f) * 0.35f + 0.65f;
+        const float s2Alpha = cosf(t * 5.0f + 1.2f) * 0.35f + 0.65f;
+        const float s3Alpha = sinf(t * 7.0f + 2.5f) * 0.35f + 0.65f;
+
+        RenderSparkleStar(dl, ImVec2(tipPos.x - 14.0f, tipPos.y - 22.0f + sinf(t * 3.0f) * 2.0f), 4.5f, IM_COL32(56, 189, 248, 255), s1Alpha);
+        RenderSparkleStar(dl, ImVec2(tipPos.x + 14.0f, tipPos.y - 24.0f + cosf(t * 3.5f) * 2.0f), 4.0f, IM_COL32(251, 191, 36, 255), s2Alpha);
+        RenderSparkleStar(dl, ImVec2(tipPos.x - 16.0f, tipPos.y - 10.0f + sinf(t * 4.0f) * 1.5f), 3.5f, IM_COL32(244, 114, 182, 255), s3Alpha);
+        RenderSparkleStar(dl, ImVec2(tipPos.x + 16.0f, tipPos.y - 12.0f + cosf(t * 4.5f) * 1.5f), 3.5f, IM_COL32(255, 255, 255, 255), s1Alpha);
+
+        if (drillTexture_)
+        {
+            // Frame calculation: 6 frames looping at ~10-12 FPS
+            const int totalFrames = 6;
+            const int frameIdx = static_cast<int>(fmodf(t * (isDownloading ? 12.0f : 6.0f), static_cast<float>(totalFrames)));
+            const float singleFrameW = 49.0f;
+            const float singleFrameH = 86.0f;
+
+            const float u0 = (frameIdx * singleFrameW) / static_cast<float>(drillTexW_);
+            const float v0 = 0.0f;
+            const float u1 = ((frameIdx + 1) * singleFrameW) / static_cast<float>(drillTexW_);
+            const float v1 = singleFrameH / static_cast<float>(drillTexH_);
+
+            // Scaled render size (0.54x scale -> ~26.5 x 46.4 px, sitting perfectly on the progress bar)
+            const float scale = 0.54f;
+            const float drawW = singleFrameW * scale;
+            const float drawH = singleFrameH * scale;
+
+            const ImVec2 spriteMin(tipPos.x - drawW * 0.5f, tipPos.y - drawH + 3.0f);
+            const ImVec2 spriteMax(tipPos.x + drawW * 0.5f, tipPos.y + 3.0f);
+
+            dl->AddImage(
+                reinterpret_cast<ImTextureID>(drillTexture_),
+                spriteMin,
+                spriteMax,
+                ImVec2(u0, v0),
+                ImVec2(u1, v1),
+                IM_COL32(255, 255, 255, 255));
+        }
+        else
+        {
+            RenderMascotDrillIndicator(dl, tipPos, t, isDownloading);
+        }
     }
 
     ImGui::Dummy(size);
@@ -1556,5 +1601,126 @@ void LauncherView::UnloadHeroTexture() noexcept
     {
         heroTexture_->Release();
         heroTexture_ = nullptr;
+    }
+}
+
+void LauncherView::LoadDrillTexture(IDirect3DDevice9* device, const std::wstring& exeDir) noexcept
+{
+    if (!device) return;
+    if (drillTexture_) return;
+
+    std::vector<std::filesystem::path> candidatePaths;
+    if (!exeDir.empty())
+    {
+        const std::filesystem::path dir(exeDir);
+        candidatePaths.push_back(dir / L"LauncherData" / L"assets" / L"drill" / L"drill_sheet.png");
+        candidatePaths.push_back(dir / L"LauncherData" / L"assets" / L"drill" / L"drill_0.png");
+        candidatePaths.push_back(dir / L"assets" / L"drill" / L"drill_sheet.png");
+    }
+    candidatePaths.push_back(L"LauncherData/assets/drill/drill_sheet.png");
+    candidatePaths.push_back(L"LauncherData/assets/drill/drill_0.png");
+    candidatePaths.push_back(L"assets/drill/drill_sheet.png");
+
+    int width = 0, height = 0, channels = 0;
+    unsigned char* data = nullptr;
+    std::string loadedPath;
+
+    for (const auto& p : candidatePaths)
+    {
+        if (!std::filesystem::exists(p))
+            continue;
+
+        FILE* f = nullptr;
+        if (_wfopen_s(&f, p.c_str(), L"rb") == 0 && f)
+        {
+            data = stbi_load_from_file(f, &width, &height, &channels, 4);
+            fclose(f);
+            if (data)
+            {
+                loadedPath = p.string();
+                break;
+            }
+        }
+    }
+
+    if (!data)
+        return;
+
+    const UINT texW = GetNextPowerOfTwo(static_cast<UINT>(width));
+    const UINT texH = GetNextPowerOfTwo(static_cast<UINT>(height));
+
+    LPDIRECT3DTEXTURE9 texture = nullptr;
+    HRESULT hr = device->CreateTexture(
+        texW,
+        texH,
+        1,
+        D3DUSAGE_DYNAMIC,
+        D3DFMT_A8R8G8B8,
+        D3DPOOL_DEFAULT,
+        &texture,
+        nullptr);
+
+    if (FAILED(hr) || !texture)
+    {
+        hr = device->CreateTexture(
+            texW,
+            texH,
+            1,
+            0,
+            D3DFMT_A8R8G8B8,
+            D3DPOOL_MANAGED,
+            &texture,
+            nullptr);
+    }
+
+    if (FAILED(hr) || !texture)
+    {
+        stbi_image_free(data);
+        return;
+    }
+
+    D3DLOCKED_RECT rect;
+    HRESULT lockHr = texture->LockRect(0, &rect, nullptr, D3DLOCK_DISCARD);
+    if (FAILED(lockHr))
+        lockHr = texture->LockRect(0, &rect, nullptr, 0);
+
+    if (SUCCEEDED(lockHr))
+    {
+        unsigned char* dest = static_cast<unsigned char*>(rect.pBits);
+        std::memset(dest, 0, rect.Pitch * texH);
+
+        for (int y = 0; y < height; ++y)
+        {
+            unsigned char* rowDest = dest + y * rect.Pitch;
+            const unsigned char* rowSrc = data + y * width * 4;
+            for (int x = 0; x < width; ++x)
+            {
+                rowDest[x * 4 + 0] = rowSrc[x * 4 + 2]; // B
+                rowDest[x * 4 + 1] = rowSrc[x * 4 + 1]; // G
+                rowDest[x * 4 + 2] = rowSrc[x * 4 + 0]; // R
+                rowDest[x * 4 + 3] = rowSrc[x * 4 + 3]; // A
+            }
+        }
+        texture->UnlockRect(0);
+        drillTexture_ = texture;
+        drillTexW_ = texW;
+        drillTexH_ = texH;
+    }
+    else
+    {
+        texture->Release();
+    }
+
+    stbi_image_free(data);
+}
+
+void LauncherView::UnloadDrillTexture() noexcept
+{
+    if (drillTexture_)
+    {
+        drillTexture_->Release();
+        drillTexture_ = nullptr;
+        drillTexW_ = 0;
+        drillTexH_ = 0;
     }
 }
