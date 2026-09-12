@@ -15,6 +15,8 @@
 #include "stb_image.h"
 
 #include <filesystem>
+#include <random>
+#include <cctype>
 #include "Config.h"
 #include "Language.h"
 #include "Logger.h"
@@ -827,23 +829,22 @@ void LauncherView::RenderTricksterProgressBar(
         RenderSparkleStar(dl, ImVec2(tipPos.x - 16.0f, tipPos.y - 10.0f + sinf(t * 4.0f) * 1.5f), 3.5f, IM_COL32(244, 114, 182, 255), s3Alpha);
         RenderSparkleStar(dl, ImVec2(tipPos.x + 16.0f, tipPos.y - 12.0f + cosf(t * 4.5f) * 1.5f), 3.5f, IM_COL32(255, 255, 255, 255), s1Alpha);
 
-        if (drillTexture_)
+        if (drillTexture_ && drillFrameCount_ > 0 && drillTexW_ > 0 && drillTexH_ > 0)
         {
-            // Frame calculation: 6 frames looping at ~10-12 FPS
-            const int totalFrames = 6;
-            const int frameIdx = static_cast<int>(fmodf(t * (isDownloading ? 12.0f : 6.0f), static_cast<float>(totalFrames)));
-            const float singleFrameW = 49.0f;
-            const float singleFrameH = 86.0f;
+            // Frame calculation: dynamically loop through drillFrameCount_ frames (~12 FPS downloading, ~6 FPS idle)
+            const int frameIdx = static_cast<int>(fmodf(t * (isDownloading ? 12.0f : 6.0f), static_cast<float>(drillFrameCount_)));
+            const float cellW = drillCellW_ > 0.0f ? drillCellW_ : 49.0f;
+            const float cellH = drillCellH_ > 0.0f ? drillCellH_ : 64.0f;
 
-            const float u0 = (frameIdx * singleFrameW) / static_cast<float>(drillTexW_);
+            const float u0 = (frameIdx * cellW) / static_cast<float>(drillTexW_);
             const float v0 = 0.0f;
-            const float u1 = ((frameIdx + 1) * singleFrameW) / static_cast<float>(drillTexW_);
-            const float v1 = singleFrameH / static_cast<float>(drillTexH_);
+            const float u1 = ((frameIdx + 1) * cellW) / static_cast<float>(drillTexW_);
+            const float v1 = cellH / static_cast<float>(drillTexH_);
 
-            // Scaled render size (0.54x scale -> ~26.5 x 46.4 px, sitting perfectly on the progress bar)
-            const float scale = 0.54f;
-            const float drawW = singleFrameW * scale;
-            const float drawH = singleFrameH * scale;
+            // Scaled render size (target ~44px height so all character classes look proportionate)
+            const float scale = 44.0f / cellH;
+            const float drawW = cellW * scale;
+            const float drawH = cellH * scale;
 
             const ImVec2 spriteMin(tipPos.x - drawW * 0.5f, tipPos.y - drawH + 3.0f);
             const ImVec2 spriteMax(tipPos.x + drawW * 0.5f, tipPos.y + 3.0f);
@@ -1609,45 +1610,193 @@ void LauncherView::LoadDrillTexture(IDirect3DDevice9* device, const std::wstring
     if (!device) return;
     if (drillTexture_) return;
 
-    std::vector<std::filesystem::path> candidatePaths;
+    // Find valid drill root directories
+    std::vector<std::filesystem::path> rootCandidates;
     if (!exeDir.empty())
     {
         const std::filesystem::path dir(exeDir);
-        candidatePaths.push_back(dir / L"LauncherData" / L"assets" / L"drill" / L"drill_sheet.png");
-        candidatePaths.push_back(dir / L"LauncherData" / L"assets" / L"drill" / L"drill_0.png");
-        candidatePaths.push_back(dir / L"assets" / L"drill" / L"drill_sheet.png");
+        rootCandidates.push_back(dir / L"LauncherData" / L"assets" / L"drill");
+        rootCandidates.push_back(dir / L"assets" / L"drill");
     }
-    candidatePaths.push_back(L"LauncherData/assets/drill/drill_sheet.png");
-    candidatePaths.push_back(L"LauncherData/assets/drill/drill_0.png");
-    candidatePaths.push_back(L"assets/drill/drill_sheet.png");
+    rootCandidates.push_back(L"LauncherData/assets/drill");
+    rootCandidates.push_back(L"assets/drill");
 
-    int width = 0, height = 0, channels = 0;
-    unsigned char* data = nullptr;
-    std::string loadedPath;
-
-    for (const auto& p : candidatePaths)
+    std::filesystem::path drillRoot;
+    for (const auto& rc : rootCandidates)
     {
-        if (!std::filesystem::exists(p))
-            continue;
-
-        FILE* f = nullptr;
-        if (_wfopen_s(&f, p.c_str(), L"rb") == 0 && f)
+        std::error_code ec;
+        if (std::filesystem::exists(rc, ec) && std::filesystem::is_directory(rc, ec))
         {
-            data = stbi_load_from_file(f, &width, &height, &channels, 4);
-            fclose(f);
-            if (data)
+            drillRoot = rc;
+            break;
+        }
+    }
+
+    if (drillRoot.empty())
+        return;
+
+    // Determine which character folder to use
+    std::filesystem::path targetFolder;
+    if (!selectedDrillDir_.empty())
+    {
+        std::error_code ec;
+        if (std::filesystem::exists(selectedDrillDir_, ec) && std::filesystem::is_directory(selectedDrillDir_, ec))
+        {
+            targetFolder = selectedDrillDir_;
+        }
+    }
+
+    if (targetFolder.empty())
+    {
+        // Enumerate all subdirectories in drillRoot
+        std::vector<std::filesystem::path> subDirs;
+        std::error_code ec;
+        for (const auto& entry : std::filesystem::directory_iterator(drillRoot, ec))
+        {
+            if (entry.is_directory(ec))
             {
-                loadedPath = p.string();
-                break;
+                subDirs.push_back(entry.path());
+            }
+        }
+
+        if (!subDirs.empty())
+        {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<size_t> dist(0, subDirs.size() - 1);
+            targetFolder = subDirs[dist(gen)];
+            selectedDrillDir_ = targetFolder.wstring();
+            Logger::Log("Random drill character chosen: " + targetFolder.filename().string());
+        }
+        else
+        {
+            targetFolder = drillRoot;
+            selectedDrillDir_ = targetFolder.wstring();
+        }
+    }
+
+    // Now load animation frames from targetFolder
+    struct RawFrame
+    {
+        int w = 0;
+        int h = 0;
+        unsigned char* data = nullptr;
+    };
+    std::vector<RawFrame> loadedFrames;
+
+    // Check if targetFolder has a single spritesheet
+    const std::filesystem::path sheetPath = targetFolder / L"drill_sheet.png";
+    std::error_code ec;
+    if (std::filesystem::exists(sheetPath, ec) && !std::filesystem::is_directory(sheetPath, ec))
+    {
+        FILE* f = nullptr;
+        if (_wfopen_s(&f, sheetPath.c_str(), L"rb") == 0 && f)
+        {
+            int w = 0, h = 0, c = 0;
+            unsigned char* px = stbi_load_from_file(f, &w, &h, &c, 4);
+            fclose(f);
+            if (px)
+            {
+                loadedFrames.push_back({ w, h, px });
             }
         }
     }
 
-    if (!data)
+    // If no sheet, search for individual frame PNGs / BMPs
+    if (loadedFrames.empty())
+    {
+        std::vector<std::filesystem::path> frameFiles;
+        for (const auto& entry : std::filesystem::directory_iterator(targetFolder, ec))
+        {
+            if (!entry.is_regular_file(ec))
+                continue;
+            const std::string ext = entry.path().extension().string();
+            if (_stricmp(ext.c_str(), ".png") == 0 || _stricmp(ext.c_str(), ".bmp") == 0)
+            {
+                if (entry.path().filename().string() != "drill_sheet.png")
+                {
+                    frameFiles.push_back(entry.path());
+                }
+            }
+        }
+
+        auto extractNumber = [](const std::filesystem::path& p) -> int
+        {
+            const std::string stem = p.stem().string();
+            std::string num;
+            for (char ch : stem)
+            {
+                if (std::isdigit(static_cast<unsigned char>(ch)))
+                    num += ch;
+            }
+            return num.empty() ? 0 : std::atoi(num.c_str());
+        };
+
+        std::sort(frameFiles.begin(), frameFiles.end(), [&](const auto& a, const auto& b)
+        {
+            int numA = extractNumber(a);
+            int numB = extractNumber(b);
+            if (numA != numB) return numA < numB;
+            return a.filename().string() < b.filename().string();
+        });
+
+        for (const auto& fp : frameFiles)
+        {
+            FILE* f = nullptr;
+            if (_wfopen_s(&f, fp.c_str(), L"rb") == 0 && f)
+            {
+                int w = 0, h = 0, c = 0;
+                unsigned char* px = stbi_load_from_file(f, &w, &h, &c, 4);
+                fclose(f);
+                if (px)
+                {
+                    loadedFrames.push_back({ w, h, px });
+                }
+            }
+        }
+    }
+
+    if (loadedFrames.empty())
         return;
 
-    const UINT texW = GetNextPowerOfTwo(static_cast<UINT>(width));
-    const UINT texH = GetNextPowerOfTwo(static_cast<UINT>(height));
+    // Calculate maximum frame bounds
+    int maxW = 0, maxH = 0;
+    for (const auto& fr : loadedFrames)
+    {
+        maxW = std::max(maxW, fr.w);
+        maxH = std::max(maxH, fr.h);
+    }
+
+    if (maxW <= 0 || maxH <= 0)
+    {
+        for (auto& fr : loadedFrames)
+            stbi_image_free(fr.data);
+        return;
+    }
+
+    const int frameCount = static_cast<int>(loadedFrames.size());
+    const int totalW = maxW * frameCount;
+    const int totalH = maxH;
+
+    // Stitch all frames side-by-side into a continuous buffer, bottom-centered
+    std::vector<unsigned char> stitched(static_cast<size_t>(totalW * totalH * 4), 0);
+    for (int i = 0; i < frameCount; ++i)
+    {
+        const auto& fr = loadedFrames[i];
+        const int offX = i * maxW + (maxW - fr.w) / 2;
+        const int offY = maxH - fr.h; // Bottom align so drilling tip and base stay ground-aligned
+
+        for (int y = 0; y < fr.h; ++y)
+        {
+            unsigned char* dst = stitched.data() + ((offY + y) * totalW + offX) * 4;
+            const unsigned char* src = fr.data + (y * fr.w) * 4;
+            std::memcpy(dst, src, static_cast<size_t>(fr.w * 4));
+        }
+        stbi_image_free(fr.data);
+    }
+
+    const UINT texW = GetNextPowerOfTwo(static_cast<UINT>(totalW));
+    const UINT texH = GetNextPowerOfTwo(static_cast<UINT>(totalH));
 
     LPDIRECT3DTEXTURE9 texture = nullptr;
     HRESULT hr = device->CreateTexture(
@@ -1674,10 +1823,7 @@ void LauncherView::LoadDrillTexture(IDirect3DDevice9* device, const std::wstring
     }
 
     if (FAILED(hr) || !texture)
-    {
-        stbi_image_free(data);
         return;
-    }
 
     D3DLOCKED_RECT rect;
     HRESULT lockHr = texture->LockRect(0, &rect, nullptr, D3DLOCK_DISCARD);
@@ -1689,11 +1835,11 @@ void LauncherView::LoadDrillTexture(IDirect3DDevice9* device, const std::wstring
         unsigned char* dest = static_cast<unsigned char*>(rect.pBits);
         std::memset(dest, 0, rect.Pitch * texH);
 
-        for (int y = 0; y < height; ++y)
+        for (int y = 0; y < totalH; ++y)
         {
             unsigned char* rowDest = dest + y * rect.Pitch;
-            const unsigned char* rowSrc = data + y * width * 4;
-            for (int x = 0; x < width; ++x)
+            const unsigned char* rowSrc = stitched.data() + y * totalW * 4;
+            for (int x = 0; x < totalW; ++x)
             {
                 rowDest[x * 4 + 0] = rowSrc[x * 4 + 2]; // B
                 rowDest[x * 4 + 1] = rowSrc[x * 4 + 1]; // G
@@ -1705,13 +1851,14 @@ void LauncherView::LoadDrillTexture(IDirect3DDevice9* device, const std::wstring
         drillTexture_ = texture;
         drillTexW_ = texW;
         drillTexH_ = texH;
+        drillCellW_ = static_cast<float>(maxW);
+        drillCellH_ = static_cast<float>(maxH);
+        drillFrameCount_ = frameCount;
     }
     else
     {
         texture->Release();
     }
-
-    stbi_image_free(data);
 }
 
 void LauncherView::UnloadDrillTexture() noexcept

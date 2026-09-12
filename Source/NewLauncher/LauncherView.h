@@ -120,5 +120,9 @@ private:
     struct IDirect3DTexture9* drillTexture_ = nullptr;
     unsigned int drillTexW_ = 0;
     unsigned int drillTexH_ = 0;
+    float drillCellW_ = 49.0f;
+    float drillCellH_ = 86.0f;
+    int drillFrameCount_ = 6;
+    std::wstring selectedDrillDir_;
     std::wstring heroExeDir_;
 };
