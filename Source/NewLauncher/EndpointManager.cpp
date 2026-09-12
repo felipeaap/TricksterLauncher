@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <utility>
 
+#include "DownloadTelemetry.h"
 #include "Logger.h"
 
 namespace
@@ -31,7 +32,8 @@ EndpointManager::EndpointManager(std::vector<std::string> hosts,
 
 bool EndpointManager::Fetch(const std::string& path, std::string& outBody) const
 {
-    for (const auto& host : hosts_)
+    const auto rankedHosts = download_telemetry::GetRankedHosts(hosts_);
+    for (const auto& host : rankedHosts)
     {
         if (host.empty())
             continue;
@@ -58,7 +60,8 @@ bool EndpointManager::Download(const std::string& remotePath,
                                DownloadManager::SpeedCallback speed,
                                const std::string& expectedHash) const
 {
-    for (const auto& host : hosts_)
+    const auto rankedHosts = download_telemetry::GetRankedHosts(hosts_);
+    for (const auto& host : rankedHosts)
     {
         if (host.empty())
             continue;
@@ -81,3 +84,4 @@ bool EndpointManager::Download(const std::string& remotePath,
 
     return false;
 }
+

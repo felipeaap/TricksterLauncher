@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <random>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -15,6 +16,7 @@
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.h"
+#include "DownloadTelemetry.h"
 
 namespace
 {
@@ -50,12 +52,36 @@ struct SegmentState
 };
 
 template <typename Client>
-bool FetchImpl(Client& client, const std::string& path, std::string& outBody, int timeoutSeconds)
+void ConfigureClient(Client& client, int timeoutSeconds)
 {
     client.set_follow_location(true);
+    client.set_keep_alive(true);
+    client.set_tcp_nodelay(true);
     client.set_connection_timeout(timeoutSeconds, 0);
     client.set_read_timeout(timeoutSeconds, 0);
     client.set_write_timeout(timeoutSeconds, 0);
+    client.set_socket_options([](socket_t sock)
+    {
+        int bufSize = 1024 * 1024; // 1 MB TCP receive buffer for high-latency BDP links
+        setsockopt(sock, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char*>(&bufSize), sizeof(bufSize));
+    });
+}
+
+long long CalculateBackoffWithJitter(int baseDelayMs, int attempt)
+{
+    if (baseDelayMs <= 0)
+        return 0;
+
+    const long long expBackoff = static_cast<long long>(baseDelayMs) * (1LL << (std::min)(attempt, 4));
+    thread_local std::mt19937_64 rng(std::random_device{}());
+    std::uniform_int_distribution<long long> dist(expBackoff / 2, expBackoff);
+    return dist(rng);
+}
+
+template <typename Client>
+bool FetchImpl(Client& client, const std::string& path, std::string& outBody, int timeoutSeconds)
+{
+    ConfigureClient(client, timeoutSeconds);
 
     const auto response = client.Get(path.c_str());
     if (!response || response->status != 200)
@@ -127,10 +153,7 @@ RemoteInfo ProbeRemote(Client& client,
                        int timeoutSeconds)
 {
     RemoteInfo info;
-    client.set_follow_location(true);
-    client.set_connection_timeout(timeoutSeconds, 0);
-    client.set_read_timeout(timeoutSeconds, 0);
-    client.set_write_timeout(timeoutSeconds, 0);
+    ConfigureClient(client, timeoutSeconds);
 
     const std::string url = "/Update/" + remotePath;
     const auto head = client.Head(url.c_str());
@@ -321,10 +344,7 @@ bool DownloadRange(Client& client,
     if (start > end)
         return true;
 
-    client.set_follow_location(true);
-    client.set_connection_timeout(timeoutSeconds, 0);
-    client.set_read_timeout(timeoutSeconds, 0);
-    client.set_write_timeout(timeoutSeconds, 0);
+    ConfigureClient(client, timeoutSeconds);
 
     httplib::Headers headers;
     headers.emplace("Range", "bytes=" + std::to_string(start) + "-" + std::to_string(end));
@@ -414,10 +434,7 @@ bool DownloadSingleWithResume(Client& client,
 
     for (int attempt = 0; attempt <= options.maxRetries; ++attempt)
     {
-        client.set_follow_location(true);
-        client.set_connection_timeout(options.connectionTimeoutSeconds, 0);
-        client.set_read_timeout(options.connectionTimeoutSeconds, 0);
-        client.set_write_timeout(options.connectionTimeoutSeconds, 0);
+        ConfigureClient(client, options.connectionTimeoutSeconds);
 
         httplib::Headers headers;
         if (offset > 0)
@@ -510,7 +527,7 @@ bool DownloadSingleWithResume(Client& client,
 
         if (attempt < options.maxRetries && options.retryDelayMilliseconds > 0)
         {
-            const long long backoffMs = static_cast<long long>(options.retryDelayMilliseconds) * (1LL << (std::min)(attempt, 4));
+            const long long backoffMs = CalculateBackoffWithJitter(options.retryDelayMilliseconds, attempt);
             std::this_thread::sleep_for(std::chrono::milliseconds(backoffMs));
         }
 
@@ -633,10 +650,6 @@ bool DownloadMulti(const std::string& host,
             if (useSsl)
             {
                 httplib::SSLClient client(host.c_str());
-                client.set_follow_location(true);
-                client.set_connection_timeout(options.connectionTimeoutSeconds, 0);
-                client.set_read_timeout(options.connectionTimeoutSeconds, 0);
-                client.set_write_timeout(options.connectionTimeoutSeconds, 0);
                 success = DownloadRange(client, remotePath, partPath,
                                         segment.start, segment.end,
                                         segmentProgresses[index],
@@ -647,10 +660,6 @@ bool DownloadMulti(const std::string& host,
             else
             {
                 httplib::Client client(host.c_str());
-                client.set_follow_location(true);
-                client.set_connection_timeout(options.connectionTimeoutSeconds, 0);
-                client.set_read_timeout(options.connectionTimeoutSeconds, 0);
-                client.set_write_timeout(options.connectionTimeoutSeconds, 0);
                 success = DownloadRange(client, remotePath, partPath,
                                         segment.start, segment.end,
                                         segmentProgresses[index],
@@ -675,7 +684,7 @@ bool DownloadMulti(const std::string& host,
 
             if (attempt < options.maxRetries && options.retryDelayMilliseconds > 0)
             {
-                const long long backoffMs = static_cast<long long>(options.retryDelayMilliseconds) * (1LL << (std::min)(attempt, 4));
+                const long long backoffMs = CalculateBackoffWithJitter(options.retryDelayMilliseconds, attempt);
                 std::this_thread::sleep_for(std::chrono::milliseconds(backoffMs));
             }
         }
@@ -730,7 +739,7 @@ DownloadManager::DownloadManager(std::string host, bool useSsl, Options options)
     if (options_.maxRetries < 0)
         options_.maxRetries = 0;
     if (options_.connectionTimeoutSeconds <= 0)
-        options_.connectionTimeoutSeconds = 5;
+        options_.connectionTimeoutSeconds = 10;
     if (options_.retryDelayMilliseconds < 0)
         options_.retryDelayMilliseconds = 0;
     if (options_.maxConnections <= 0)
@@ -765,6 +774,7 @@ bool DownloadManager::Download(const std::string& remotePath,
                                ErrorCallback errorCallback,
                                const std::string& expectedHash) const
 {
+    const auto overallStartTime = std::chrono::steady_clock::now();
     const std::filesystem::path destination(localPath);
     const auto partPath = MakePartPath(destination);
     const auto metadataPath = MakeMetadataPath(destination);
@@ -792,6 +802,10 @@ bool DownloadManager::Download(const std::string& remotePath,
         std::ofstream emptyFile(destination, std::ios::binary | std::ios::trunc);
         emptyFile.close();
 
+        const double elapsed = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - overallStartTime).count();
+        download_telemetry::Record({ host_, remotePath, 0, elapsed, 1, false, true });
+
         if (progress)
             progress(0, 0);
         if (speed)
@@ -800,9 +814,11 @@ bool DownloadManager::Download(const std::string& remotePath,
     }
 
     bool success = false;
-    if (info.exists && info.rangeSupported &&
-        info.size >= options_.multiConnectionThresholdBytes &&
-        options_.maxConnections > 1)
+    const bool isMulti = (info.exists && info.rangeSupported &&
+                          info.size >= options_.multiConnectionThresholdBytes &&
+                          options_.maxConnections > 1);
+
+    if (isMulti)
     {
         success = DownloadMulti(host_, useSsl_, remotePath, partPath, metadataPath,
                                 info.size, progress, speed, errorCallback, expectedHash, options_);
@@ -835,6 +851,9 @@ bool DownloadManager::Download(const std::string& remotePath,
     if (!success)
     {
         CleanTemporaryDownloadFiles(destination);
+        const double elapsed = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - overallStartTime).count();
+        download_telemetry::Record({ host_, remotePath, 0, elapsed, isMulti ? options_.maxConnections : 1, isMulti, false });
         if (errorCallback)
             errorCallback("Download failed for: " + remotePath);
         return false;
@@ -844,6 +863,9 @@ bool DownloadManager::Download(const std::string& remotePath,
     if (!std::filesystem::exists(partPath, error))
     {
         CleanTemporaryDownloadFiles(destination);
+        const double elapsed = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - overallStartTime).count();
+        download_telemetry::Record({ host_, remotePath, 0, elapsed, isMulti ? options_.maxConnections : 1, isMulti, false });
         if (errorCallback)
             errorCallback("Downloaded file missing part file for: " + remotePath);
         return false;
@@ -853,6 +875,9 @@ bool DownloadManager::Download(const std::string& remotePath,
     if (info.size > 0 && downloadedBytes != info.size)
     {
         CleanTemporaryDownloadFiles(destination);
+        const double elapsed = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - overallStartTime).count();
+        download_telemetry::Record({ host_, remotePath, 0, elapsed, isMulti ? options_.maxConnections : 1, isMulti, false });
         if (errorCallback)
             errorCallback("Downloaded file size mismatch for: " + remotePath);
         return false;
@@ -878,6 +903,9 @@ bool DownloadManager::Download(const std::string& remotePath,
         if (error)
         {
             CleanTemporaryDownloadFiles(destination);
+            const double elapsed = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - overallStartTime).count();
+            download_telemetry::Record({ host_, remotePath, 0, elapsed, isMulti ? options_.maxConnections : 1, isMulti, false });
             if (errorCallback)
                 errorCallback("Failed to move completed part file to final destination: " + destination.string());
             return false;
@@ -886,6 +914,10 @@ bool DownloadManager::Download(const std::string& remotePath,
 
     CleanTemporaryDownloadFiles(destination);
 
+    const double elapsed = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - overallStartTime).count();
+    download_telemetry::Record({ host_, remotePath, downloadedBytes, elapsed, isMulti ? options_.maxConnections : 1, isMulti, true });
+
     if (progress)
         progress(downloadedBytes, downloadedBytes);
     if (speed)
@@ -893,4 +925,5 @@ bool DownloadManager::Download(const std::string& remotePath,
 
     return true;
 }
+
 

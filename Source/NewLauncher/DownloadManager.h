@@ -14,7 +14,7 @@ public:
     struct Options
     {
         int maxRetries = 3;
-        int connectionTimeoutSeconds = 5;
+        int connectionTimeoutSeconds = 10;
         int retryDelayMilliseconds = 500;
         int maxConnections = 4;
         long long multiConnectionThresholdBytes = 8LL * 1024 * 1024;
