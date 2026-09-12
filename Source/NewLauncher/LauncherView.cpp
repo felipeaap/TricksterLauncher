@@ -831,8 +831,8 @@ void LauncherView::RenderTricksterProgressBar(
 
         if (drillTexture_ && drillFrameCount_ > 0 && drillTexW_ > 0 && drillTexH_ > 0)
         {
-            // Frame calculation: dynamically loop through drillFrameCount_ frames (~16 FPS downloading, ~8 FPS idle)
-            const int frameIdx = static_cast<int>(fmodf(t * (isDownloading ? 16.0f : 8.0f), static_cast<float>(drillFrameCount_)));
+            // Frame calculation: dynamically loop through drillFrameCount_ frames (~60 FPS downloading, ~30 FPS idle)
+            const int frameIdx = static_cast<int>(fmodf(t * (isDownloading ? 60.0f : 30.0f), static_cast<float>(drillFrameCount_)));
             const float cellW = drillCellW_ > 0.0f ? drillCellW_ : 49.0f;
             const float cellH = drillCellH_ > 0.0f ? drillCellH_ : 64.0f;
 
