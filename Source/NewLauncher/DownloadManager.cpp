@@ -54,6 +54,8 @@ std::string GetImpl(Client& client, const std::string& path, int timeoutSeconds)
 {
     client.set_follow_location(true);
     client.set_connection_timeout(timeoutSeconds, 0);
+    client.set_read_timeout(timeoutSeconds, 0);
+    client.set_write_timeout(timeoutSeconds, 0);
 
     const auto response = client.Get(path.c_str());
     if (!response || response->status != 200)
@@ -115,6 +117,8 @@ RemoteInfo ProbeRemote(Client& client,
     RemoteInfo info;
     client.set_follow_location(true);
     client.set_connection_timeout(timeoutSeconds, 0);
+    client.set_read_timeout(timeoutSeconds, 0);
+    client.set_write_timeout(timeoutSeconds, 0);
 
     const std::string url = "/Update/" + remotePath;
     const auto head = client.Head(url.c_str());
@@ -307,6 +311,8 @@ bool DownloadRange(Client& client,
 
     client.set_follow_location(true);
     client.set_connection_timeout(timeoutSeconds, 0);
+    client.set_read_timeout(timeoutSeconds, 0);
+    client.set_write_timeout(timeoutSeconds, 0);
 
     httplib::Headers headers;
     headers.emplace("Range", "bytes=" + std::to_string(start) + "-" + std::to_string(end));
@@ -398,6 +404,8 @@ bool DownloadSingleWithResume(Client& client,
     {
         client.set_follow_location(true);
         client.set_connection_timeout(options.connectionTimeoutSeconds, 0);
+        client.set_read_timeout(options.connectionTimeoutSeconds, 0);
+        client.set_write_timeout(options.connectionTimeoutSeconds, 0);
 
         httplib::Headers headers;
         if (offset > 0)
@@ -615,6 +623,8 @@ bool DownloadMulti(const std::string& host,
                 httplib::SSLClient client(host.c_str());
                 client.set_follow_location(true);
                 client.set_connection_timeout(options.connectionTimeoutSeconds, 0);
+                client.set_read_timeout(options.connectionTimeoutSeconds, 0);
+                client.set_write_timeout(options.connectionTimeoutSeconds, 0);
                 success = DownloadRange(client, remotePath, partPath,
                                         segment.start, segment.end,
                                         segmentProgresses[index],
@@ -627,6 +637,8 @@ bool DownloadMulti(const std::string& host,
                 httplib::Client client(host.c_str());
                 client.set_follow_location(true);
                 client.set_connection_timeout(options.connectionTimeoutSeconds, 0);
+                client.set_read_timeout(options.connectionTimeoutSeconds, 0);
+                client.set_write_timeout(options.connectionTimeoutSeconds, 0);
                 success = DownloadRange(client, remotePath, partPath,
                                         segment.start, segment.end,
                                         segmentProgresses[index],

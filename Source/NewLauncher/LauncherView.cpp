@@ -35,7 +35,7 @@ void LauncherView::Initialize() noexcept
 
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
-    const ImWchar* glyphRanges = io.Fonts->GetGlyphRangesChineseFull();
+    const ImWchar* glyphRanges = io.Fonts->GetGlyphRangesDefault();
     const float smallFontSize = 13.0f;
     const float baseFontSize = 14.5f;
     const float boldFontSize = 16.5f;

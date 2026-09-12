@@ -48,7 +48,7 @@ private:
     std::thread workerThread_;
     std::atomic<bool> isWorkerDone_{ false };
     std::atomic<bool> isRunning_{ false };
-    bool isMaintenance_ = false;
+    std::atomic<bool> isMaintenance_{ false };
     bool isVerifying_ = false;
     bool shouldClose_ = false;
 

@@ -60,14 +60,8 @@ void LauncherPresenter::Initialize() noexcept
     LauncherState::SetProgress(0.0f, 0.0f);
     LauncherState::SetButtons(false, false, false);
 
-    // Check maintenance status
-    const std::string maintenanceResponse = FetchFromCDN("/maintenance.txt");
-    isMaintenance_ = (maintenanceResponse == "true");
-    LauncherState::SetMaintenance(isMaintenance_);
-
     if (!isVerifying_)
     {
-        CheckSelfUpdate();
         CheckUpdatesAsync(false);
         isVerifying_ = true;
     }
@@ -287,6 +281,24 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
     {
         try
         {
+            // Check maintenance status
+            const std::string maintenanceResponse = FetchFromCDN("/maintenance.txt");
+            const bool maint = (maintenanceResponse == "true");
+            isMaintenance_.store(maint, std::memory_order_release);
+            LauncherState::SetMaintenance(maint);
+
+            // Check self-update
+            CheckSelfUpdate();
+
+            if (maint)
+            {
+                std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
+                LauncherState::fileString = lang::GetString("launcher_worker_maintenance");
+                isWorkerDone_.store(true, std::memory_order_release);
+                isRunning_.store(false, std::memory_order_release);
+                return;
+            }
+
             UpdateCoordinator coordinator(
                 [this](const std::string& path)
                 {
