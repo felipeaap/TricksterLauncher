@@ -50,8 +50,6 @@ public:
     void UnloadHeroTexture() noexcept;
     void LoadDrillTexture(struct IDirect3DDevice9* device, const std::wstring& exeDir = L"") noexcept;
     void UnloadDrillTexture() noexcept;
-    void LoadButtonTextures(struct IDirect3DDevice9* device, const std::wstring& exeDir = L"") noexcept;
-    void UnloadButtonTextures() noexcept;
 
 private:
     bool ModernButton(
@@ -62,11 +60,6 @@ private:
         ButtonIcon icon = ButtonIcon::None,
         ImU32 accentColor = IM_COL32(0, 162, 237, 255),
         bool pulseGlow = false) noexcept;
-
-    bool RenderEpicGameStartButton(
-        const char* id,
-        const ImVec2& size,
-        bool isLocked) noexcept;
 
     static void RenderButtonIcon(
         ButtonIcon icon,
@@ -132,11 +125,4 @@ private:
     int drillFrameCount_ = 6;
     std::wstring selectedDrillDir_;
     std::wstring heroExeDir_;
-
-    struct IDirect3DTexture9* btnStartNormalTex_ = nullptr;
-    struct IDirect3DTexture9* btnStartHoverTex_ = nullptr;
-    struct IDirect3DTexture9* btnStartPressTex_ = nullptr;
-    struct IDirect3DTexture9* btnStartDisabledTex_ = nullptr;
-    ImVec2 btnStartUvMin_{ 0.0f, 0.0f };
-    ImVec2 btnStartUvMax_{ 1.0f, 1.0f };
 };
