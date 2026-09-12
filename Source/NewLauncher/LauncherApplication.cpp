@@ -146,23 +146,23 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     ImGui_ImplDX9_Init(renderer.Device());
     Logger::Log("ImGui initialised");
 
-    // ── Textures (Hero Banner & Drill Mascot) ────────────────────────────────
+    // ── Textures (Hero Banner, Drill Mascot & Epic Button) ───────────────────
     launcherView.LoadHeroTexture(renderer.Device(), folderPath);
     launcherView.LoadDrillTexture(renderer.Device(), folderPath);
-    launcherView.LoadPlayButtonTexture(renderer.Device(), folderPath);
+    launcherView.LoadButtonTextures(renderer.Device(), folderPath);
 
     renderer.SetDeviceResetCallbacks(
         [&launcherView]()
         {
             launcherView.UnloadHeroTexture();
             launcherView.UnloadDrillTexture();
-            launcherView.UnloadPlayButtonTexture();
+            launcherView.UnloadButtonTextures();
         },
         [&launcherView, &renderer, folderPath]()
         {
             launcherView.LoadHeroTexture(renderer.Device(), folderPath);
             launcherView.LoadDrillTexture(renderer.Device(), folderPath);
-            launcherView.LoadPlayButtonTexture(renderer.Device(), folderPath);
+            launcherView.LoadButtonTextures(renderer.Device(), folderPath);
         });
 
     // ── Presenter ────────────────────────────────────────────────────────────
@@ -205,7 +205,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     // ── Teardown ─────────────────────────────────────────────────────────────
     launcherView.UnloadHeroTexture();
     launcherView.UnloadDrillTexture();
-    launcherView.UnloadPlayButtonTexture();
+    launcherView.UnloadButtonTextures();
     presenter.Shutdown();
 
     ImGui_ImplDX9_Shutdown();
