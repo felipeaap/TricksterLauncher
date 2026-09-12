@@ -46,6 +46,9 @@ public:
     void SetSavedAccount(const std::string& account, bool remember = true) noexcept;
     void SetAuthError(const std::string& error) noexcept { authErrorText_ = error; }
 
+    void LoadHeroTexture(struct IDirect3DDevice9* device, const std::wstring& exeDir = L"") noexcept;
+    void UnloadHeroTexture() noexcept;
+
 private:
     bool ModernButton(
         const char* id,
@@ -101,4 +104,8 @@ private:
     float gameStartUnlockSweep_ = 0.0f;
     bool wasGameEnabled_ = false;
     std::unordered_map<std::string, float> buttonHover_;
+    struct IDirect3DTexture9* heroTexture_ = nullptr;
+    ImVec2 heroTexUvMin_{ 0.0f, 0.0f };
+    ImVec2 heroTexUvMax_{ 1.0f, 1.0f };
+    std::wstring heroExeDir_;
 };

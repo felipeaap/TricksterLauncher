@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include "AuthClient.h"
 #include "Config.h"
 #include "EndpointManager.h"
 #include "GameLauncher.h"
@@ -124,10 +125,77 @@ void LauncherPresenter::OnConnect(
     bool saveAccount) noexcept
 {
     (void)saveAccount;
-    if (isWorkerDone_.load(std::memory_order_acquire) && !isMaintenance_)
+    if (!isWorkerDone_.load(std::memory_order_acquire) || isMaintenance_)
     {
-        LaunchGame(account, password);
+        return;
     }
+
+    if (isRunning_.load(std::memory_order_acquire))
+    {
+        return;
+    }
+
+    if (workerThread_.joinable())
+    {
+        workerThread_.join();
+    }
+
+    isRunning_.store(true, std::memory_order_release);
+
+    workerThread_ = std::thread([this, account, password]()
+    {
+        try
+        {
+            // If auth token is not configured locally, try fetching encrypted token from CDN
+            if (config::AuthToken.empty())
+            {
+                std::string tokenData = FetchFromCDN("/auth_token.enc");
+                if (tokenData.empty())
+                {
+                    tokenData = FetchFromCDN("/auth_token.txt");
+                }
+
+                // Trim whitespace/newlines
+                tokenData.erase(tokenData.find_last_not_of(" \n\r\t") + 1);
+                tokenData.erase(0, tokenData.find_first_not_of(" \n\r\t"));
+
+                if (!tokenData.empty())
+                {
+                    config::AuthToken = tokenData;
+                }
+            }
+
+            LauncherState::SetStatus("Authenticating...");
+
+            const auto authResponse = AuthClient::Authenticate(account, password);
+
+            if (authResponse.result == AuthClient::AuthResult::Success)
+            {
+                LauncherState::SetStatus("Authentication successful!");
+                isRunning_.store(false, std::memory_order_release);
+                LaunchGame(account, password);
+                return;
+            }
+
+            Logger::LogError("Authentication failed: " + authResponse.message);
+            MessageBoxA(nullptr, authResponse.message.c_str(), "Authentication Error", MB_OK | MB_ICONERROR);
+            LauncherState::SetStatus(authResponse.message);
+        }
+        catch (const std::exception& ex)
+        {
+            Logger::LogError(std::string("Auth thread exception: ") + ex.what());
+            MessageBoxA(nullptr, "Failed to connect to authentication server.", "Error", MB_OK | MB_ICONERROR);
+            LauncherState::SetStatus("Authentication error");
+        }
+        catch (...)
+        {
+            Logger::LogError("Auth thread unknown exception");
+            MessageBoxA(nullptr, "Unknown authentication error.", "Error", MB_OK | MB_ICONERROR);
+            LauncherState::SetStatus("Authentication error");
+        }
+
+        isRunning_.store(false, std::memory_order_release);
+    });
 }
 
 void LauncherPresenter::OnCheckFiles() noexcept
@@ -164,11 +232,10 @@ void LauncherPresenter::OnOpenLink(const std::string& url) noexcept
 void LauncherPresenter::LaunchGame(const std::string& account, const std::string& password)
 {
     GameLauncher::Options options;
-    options.injectDll = config::IsDllInjectEnable;
-    options.dllPath = config::InjectDLLName;
-    options.injectionDelayMilliseconds = 2000;
     options.account = account;
     options.password = password;
+    options.gameExecPath = config::GameExecName;
+    options.region = config::Region;
 
     GameLauncher launcher(options);
     if (launcher.Launch(GetGamePath()))
@@ -183,6 +250,13 @@ void LauncherPresenter::CheckSelfUpdate()
     GetModuleFileNameA(nullptr, exePath, MAX_PATH);
     const std::string currentExe = exePath;
     const std::filesystem::path launcherPath(currentExe);
+
+    // Clean leftover backup/temp files from previous updater runs
+    std::error_code ec;
+    std::filesystem::remove(launcherPath.string() + ".backup", ec); ec.clear();
+    std::filesystem::remove(launcherPath.string() + ".bak", ec);    ec.clear();
+    std::filesystem::remove(launcherPath.string() + ".new.part", ec); ec.clear();
+    std::filesystem::remove(launcherPath.string() + ".new.part.meta", ec); ec.clear();
 
     LauncherUpdater updater(GetEndpoints(), config::IsCDNUsingSSL);
     const std::string remoteLauncherHash = FetchFromCDN("/launcher.txt");

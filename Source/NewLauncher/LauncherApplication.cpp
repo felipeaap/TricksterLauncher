@@ -11,14 +11,13 @@
 #include "LauncherPresenter.h"
 #include "LauncherState.h"
 #include "LauncherView.h"
-#include "LauncherWebView.h"
 #include "LauncherWindow.h"
 #include "Logger.h"
 #include "RendererD3D9.h"
 #include "imgui.h"
 #include "imgui_impl_dx9.h"
 #include "imgui_impl_win32.h"
-
+ 
 bool LauncherApplication::RequiresAdmin(const wchar_t* folderPath)
 {
     if (!folderPath || !*folderPath)
@@ -101,11 +100,10 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     // ── Application objects ──────────────────────────────────────────────────
     LauncherWindow   launcherWindow;
     RendererD3D9     renderer;
-    LauncherWebView  webView;
     LauncherView     launcherView;
     LauncherPresenter presenter;
 
-    // ── Window resize / move callbacks ────────────────────────────────────────
+    // ── Window resize callback ────────────────────────────────────────
     launcherWindow.SetResizeCallback([&renderer](UINT width, UINT height)
     {
         if (renderer.Device())
@@ -113,12 +111,6 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
             renderer.SetBackBufferSize(width, height);
             renderer.Reset();
         }
-    });
-
-    launcherWindow.SetMoveCallback([&webView]()
-    {
-        const RECT bounds{ 19, 40, 19 + 501, 40 + 326 };
-        webView.SetBounds(bounds);
     });
 
     // ── Create window ────────────────────────────────────────────────────────
@@ -151,6 +143,19 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     ImGui_ImplDX9_Init(renderer.Device());
     Logger::Log("ImGui initialised");
 
+    // ── Hero Banner Texture ──────────────────────────────────────────────────
+    launcherView.LoadHeroTexture(renderer.Device(), folderPath);
+
+    renderer.SetDeviceResetCallbacks(
+        [&launcherView]()
+        {
+            launcherView.UnloadHeroTexture();
+        },
+        [&launcherView, &renderer, folderPath]()
+        {
+            launcherView.LoadHeroTexture(renderer.Device(), folderPath);
+        });
+
     // ── Presenter ────────────────────────────────────────────────────────────
     presenter.Initialize();
     Logger::Log("Presenter initialised");
@@ -160,10 +165,6 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     {
         launcherWindow.Minimize();
     };
-
-    // ── WebView2 ─────────────────────────────────────────────────────────────
-    webView.Initialize(launcherWindow.Handle(), config::BaseNewsURL);
-    Logger::Log("WebView2 initialised");
 
     // ── Main render loop ─────────────────────────────────────────────────────
     Logger::Log("Entering render loop");
@@ -193,7 +194,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     Logger::Log("Render loop exited");
 
     // ── Teardown ─────────────────────────────────────────────────────────────
-    webView.Shutdown();
+    launcherView.UnloadHeroTexture();
     presenter.Shutdown();
 
     ImGui_ImplDX9_Shutdown();

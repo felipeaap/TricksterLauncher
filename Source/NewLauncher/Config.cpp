@@ -11,12 +11,13 @@ namespace config
     std::string SubTitle                = "Trickster Launcher";
     std::string LauncherCDN             = "127.0.0.1:8000";
     std::vector<std::string> LauncherCDNBackups = {};
-    std::wstring BaseNewsURL            = L"http://127.0.0.1:8000/news.html";
     std::string WebsiteLink             = "http://127.0.0.1:8000";
     std::string OptionExecName          = "Setup.exe";
+    std::string GameExecName            = "Trickster/trickster.bin";
+    std::string Region                  = "thailand";
     bool IsCDNUsingSSL                  = false;
-    bool IsDllInjectEnable              = false;
-    std::string InjectDLLName           = "Trickster.dll";
+    std::string AuthEndpointURL         = "https://meuserver.com/endpoints/launcher_auth.php";
+    std::string AuthToken               = "";
     bool ManifestRequireSignature       = false;
     std::string ManifestPublicKeyPem    = {};
     std::vector<std::string> PinnedCertificateHashes = {};
@@ -61,14 +62,15 @@ namespace config
             getWString("window_title",  WindowTitle);
             getString ("subtitle",      SubTitle);
             getString ("cdn",           LauncherCDN);
-            getWString("news_url",      BaseNewsURL);
             getString ("website_link",  WebsiteLink);
             getString ("option_exec",   OptionExecName);
+            getString ("game_exec",     GameExecName);
+            getString ("region",        Region);
             getBool   ("use_ssl",       IsCDNUsingSSL);
-            getBool   ("dll_inject",    IsDllInjectEnable);
-            getString ("dll_name",      InjectDLLName);
             getBool   ("manifest_require_signature", ManifestRequireSignature);
             getString ("manifest_public_key_pem",    ManifestPublicKeyPem);
+            getString ("auth_endpoint_url",          AuthEndpointURL);
+            getString ("auth_token",                 AuthToken);
 
             if (j.contains("pinned_cert_hashes") && j["pinned_cert_hashes"].is_array())
             {

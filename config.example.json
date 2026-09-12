@@ -7,11 +7,10 @@
     "patch-mirror2.example.com"
   ],
   "use_ssl": true,
-  "news_url": "https://patch.example.com/news.html",
   "website_link": "https://example.com",
   "option_exec": "Setup.exe",
-  "dll_inject": false,
-  "dll_name": "Trickster.dll",
+  "game_exec": "Trickster/trickster.bin",
+  "region": "thailand",
   "manifest_require_signature": true,
   "manifest_public_key_pem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
   "pinned_cert_hashes": []

@@ -21,3 +21,8 @@ Output/
 *.ilk
 *.exe
 *.dll
+*.log
+
+# Test environments
+CDN_Test/
+Release_Test/

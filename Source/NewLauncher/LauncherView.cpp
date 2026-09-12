@@ -10,8 +10,14 @@
 #undef max
 #endif
 
+#include <d3d9.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+#include <filesystem>
 #include "Config.h"
 #include "Language.h"
+#include "Logger.h"
 
 void LauncherView::Initialize() noexcept
 {
@@ -253,7 +259,12 @@ bool LauncherView::ModernButton(
         ImVec2 drawP0 = ImVec2(p0.x, p0.y + yOffset);
         ImVec2 drawP1 = ImVec2(p1.x, p1.y + yOffset);
 
-        dl->AddRectFilledMultiColor(drawP0, drawP1, colTop, colTop, colBottom, colBottom);
+        // Gradient Fill — two rounded rects stacked (AddRectFilledMultiColor ignores rounding)
+        dl->AddRectFilled(drawP0, drawP1, colBottom, rounding);
+        dl->AddRectFilled(drawP0,
+            ImVec2(drawP1.x, drawP0.y + size.y * 0.5f),
+            colTop, rounding, ImDrawFlags_RoundCornersTop);
+
 
         // Soft top-half specular sheen
         const int sheenAlpha = static_cast<int>(45.0f + 25.0f * hoverVal);
@@ -804,19 +815,71 @@ void LauncherView::Render(
             1.8f);
         ImGui::PopID();
 
-        // 3. News WebView Floating Card Frame (16, 38, 522, 368)
+        // 3. Hero Banner Card Frame (17, 38, 523, 368)
+        const ImVec2 heroMin(17.0f, 38.0f);
+        const ImVec2 heroMax(523.0f, 368.0f);
+        const float heroRounding = 12.0f;
+
+        // Shadow behind Hero Card
         dl->AddRectFilled(
-            ImVec2(17.0f, 39.0f),
-            ImVec2(523.0f, 369.0f),
+            ImVec2(heroMin.x, heroMin.y + 1.0f),
+            ImVec2(heroMax.x, heroMax.y + 1.0f),
             IM_COL32(30, 70, 120, 20),
-            12.0f);
-        dl->AddRect(
-            ImVec2(17.0f, 38.0f),
-            ImVec2(522.0f, 368.0f),
-            IM_COL32(186, 215, 243, 255),
-            12.0f,
-            0,
-            1.2f);
+            heroRounding);
+
+        if (heroTexture_)
+        {
+            dl->AddImageRounded(
+                reinterpret_cast<ImTextureID>(heroTexture_),
+                heroMin,
+                heroMax,
+                heroTexUvMin_,
+                heroTexUvMax_,
+                IM_COL32(255, 255, 255, 255),
+                heroRounding);
+        }
+        else
+        {
+            // Stylized rich fallback Hero Banner background
+            dl->AddRectFilledMultiColor(
+                heroMin,
+                heroMax,
+                IM_COL32(15, 23, 42, 255),
+                IM_COL32(30, 58, 138, 255),
+                IM_COL32(88, 28, 135, 255),
+                IM_COL32(17, 24, 39, 255));
+
+            // Glowing hero accent circles & badge
+            const float heroTime = static_cast<float>(ImGui::GetTime());
+            const float pulseGlow = (sinf(heroTime * 2.0f) * 0.5f + 0.5f) * 40.0f + 60.0f;
+            dl->AddCircleFilled(
+                ImVec2((heroMin.x + heroMax.x) * 0.5f, (heroMin.y + heroMax.y) * 0.5f - 20.0f),
+                90.0f,
+                IM_COL32(59, 130, 246, static_cast<int>(pulseGlow)));
+
+            if (fontLarge_) ImGui::PushFont(fontLarge_);
+            dl->AddText(
+                ImVec2(heroMin.x + 30.0f, heroMin.y + 120.0f),
+                IM_COL32(255, 255, 255, 255),
+                "TRICKSTER ONLINE");
+            if (fontLarge_) ImGui::PopFont();
+
+            if (fontRegular_) ImGui::PushFont(fontRegular_);
+            dl->AddText(
+                ImVec2(heroMin.x + 30.0f, heroMin.y + 160.0f),
+                IM_COL32(226, 232, 240, 230),
+                "The Awakening of the Crystals - Play Now!");
+            if (fontRegular_) ImGui::PopFont();
+
+            // Fallback Hero Card Border
+            dl->AddRect(
+                heroMin,
+                heroMax,
+                IM_COL32(186, 215, 243, 255),
+                heroRounding,
+                0,
+                1.2f);
+        }
 
         // 4. Bottom Floating Card (Housing Progress, Telemetry, Controls or Login Form)
         const float bottomCardY = 376.0f;
@@ -997,4 +1060,186 @@ void LauncherView::Render(
 
     if (!showWindow)
         shouldClose_ = true;
+}
+
+static UINT GetNextPowerOfTwo(UINT n) noexcept
+{
+    UINT pow = 1;
+    while (pow < n)
+        pow <<= 1;
+    return pow;
+}
+
+void LauncherView::LoadHeroTexture(IDirect3DDevice9* device, const std::wstring& exeDir) noexcept
+{
+    if (!device) return;
+    if (heroTexture_) return;
+
+    if (!exeDir.empty())
+        heroExeDir_ = exeDir;
+
+    std::vector<std::filesystem::path> candidatePaths;
+    if (!heroExeDir_.empty())
+    {
+        const std::filesystem::path dir(heroExeDir_);
+        candidatePaths.push_back(dir / L"hero.png");
+        candidatePaths.push_back(dir / L"hero.jpg");
+        candidatePaths.push_back(dir / L"hero.jpeg");
+        candidatePaths.push_back(dir / L"hero_banner.png");
+        candidatePaths.push_back(dir / L"hero_banner.jpg");
+    }
+    candidatePaths.push_back(L"hero.png");
+    candidatePaths.push_back(L"hero.jpg");
+    candidatePaths.push_back(L"hero.jpeg");
+    candidatePaths.push_back(L"hero_banner.png");
+    candidatePaths.push_back(L"hero_banner.jpg");
+
+    int width = 0, height = 0, channels = 0;
+    unsigned char* data = nullptr;
+    std::string loadedPath;
+
+    for (const auto& p : candidatePaths)
+    {
+        if (!std::filesystem::exists(p))
+            continue;
+
+        FILE* f = nullptr;
+        if (_wfopen_s(&f, p.c_str(), L"rb") == 0 && f)
+        {
+            data = stbi_load_from_file(f, &width, &height, &channels, 4);
+            fclose(f);
+            if (data)
+            {
+                loadedPath = p.string();
+                break;
+            }
+        }
+    }
+
+    if (!data)
+    {
+        const char* err = stbi_failure_reason();
+        Logger::LogError("Hero texture load failed: Could not load image from candidate paths. STB reason: " + std::string(err ? err : "none"));
+        return;
+    }
+
+    const UINT texW = GetNextPowerOfTwo(static_cast<UINT>(width));
+    const UINT texH = GetNextPowerOfTwo(static_cast<UINT>(height));
+
+    LPDIRECT3DTEXTURE9 texture = nullptr;
+
+    // Direct3D 9Ex requires D3DPOOL_DEFAULT with D3DUSAGE_DYNAMIC (D3DPOOL_MANAGED is invalid in D3D9Ex)
+    HRESULT hr = device->CreateTexture(
+        texW,
+        texH,
+        1,
+        D3DUSAGE_DYNAMIC,
+        D3DFMT_A8R8G8B8,
+        D3DPOOL_DEFAULT,
+        &texture,
+        nullptr);
+
+    if (FAILED(hr) || !texture)
+    {
+        // Fallback for classic Direct3D 9 (non-Ex)
+        hr = device->CreateTexture(
+            texW,
+            texH,
+            1,
+            0,
+            D3DFMT_A8R8G8B8,
+            D3DPOOL_MANAGED,
+            &texture,
+            nullptr);
+    }
+
+    if (FAILED(hr) || !texture)
+    {
+        Logger::LogError("Hero texture CreateTexture failed hr=" + std::to_string(hr) + " for padded dimensions " + std::to_string(texW) + "x" + std::to_string(texH));
+        stbi_image_free(data);
+        return;
+    }
+
+    D3DLOCKED_RECT rect;
+    // Try lock with D3DLOCK_DISCARD (for D3DUSAGE_DYNAMIC) or 0
+    HRESULT lockHr = texture->LockRect(0, &rect, nullptr, D3DLOCK_DISCARD);
+    if (FAILED(lockHr))
+        lockHr = texture->LockRect(0, &rect, nullptr, 0);
+
+    if (SUCCEEDED(lockHr))
+    {
+        unsigned char* dest = static_cast<unsigned char*>(rect.pBits);
+        std::memset(dest, 0, rect.Pitch * texH);
+
+        for (int y = 0; y < height; ++y)
+        {
+            unsigned char* rowDest = dest + y * rect.Pitch;
+            const unsigned char* rowSrc = data + y * width * 4;
+            for (int x = 0; x < width; ++x)
+            {
+                rowDest[x * 4 + 0] = rowSrc[x * 4 + 2]; // B
+                rowDest[x * 4 + 1] = rowSrc[x * 4 + 1]; // G
+                rowDest[x * 4 + 2] = rowSrc[x * 4 + 0]; // R
+                rowDest[x * 4 + 3] = rowSrc[x * 4 + 3]; // A
+            }
+        }
+        texture->UnlockRect(0);
+        heroTexture_ = texture;
+
+        // Container dimensions: (523 - 17) x (368 - 38) = 506 x 330
+        constexpr float targetW = 506.0f;
+        constexpr float targetH = 330.0f;
+        constexpr float targetAspect = targetW / targetH;
+
+        const float imgW = static_cast<float>(width);
+        const float imgH = static_cast<float>(height);
+        const float imgAspect = imgW / imgH;
+
+        float cropX0 = 0.0f;
+        float cropY0 = 0.0f;
+        float cropX1 = imgW;
+        float cropY1 = imgH;
+
+        if (imgAspect > targetAspect)
+        {
+            // Wider than container: center crop left and right
+            const float visibleW = imgH * targetAspect;
+            const float offset = (imgW - visibleW) * 0.5f;
+            cropX0 = offset;
+            cropX1 = offset + visibleW;
+        }
+        else if (imgAspect < targetAspect)
+        {
+            // Taller than container: center crop top and bottom
+            const float visibleH = imgW / targetAspect;
+            const float offset = (imgH - visibleH) * 0.5f;
+            cropY0 = offset;
+            cropY1 = offset + visibleH;
+        }
+
+        heroTexUvMin_ = ImVec2(
+            cropX0 / static_cast<float>(texW),
+            cropY0 / static_cast<float>(texH));
+        heroTexUvMax_ = ImVec2(
+            cropX1 / static_cast<float>(texW),
+            cropY1 / static_cast<float>(texH));
+
+        Logger::LogError("Hero texture loaded successfully from '" + loadedPath + "' (" + std::to_string(width) + "x" + std::to_string(height) + " padded to " + std::to_string(texW) + "x" + std::to_string(texH) + ")");
+    }
+    else
+    {
+        Logger::LogError("Hero texture LockRect failed hr=" + std::to_string(lockHr));
+        texture->Release();
+    }
+
+    stbi_image_free(data);
+}
+
+void LauncherView::UnloadHeroTexture() noexcept
+{
+    if (heroTexture_)
+    {
+        heroTexture_->Release();
+        heroTexture_ = nullptr;
+    }
 }

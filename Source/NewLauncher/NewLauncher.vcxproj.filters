@@ -16,15 +16,14 @@
     <ClCompile Include="..\..\Libs\imgui\imgui_widgets.cpp"><Filter>Arquivos de Origem\imgui</Filter></ClCompile>
     <ClCompile Include="..\..\Libs\imgui\backends\imgui_impl_dx9.cpp"><Filter>Arquivos de Origem\imgui\backends</Filter></ClCompile>
     <ClCompile Include="..\..\Libs\imgui\backends\imgui_impl_win32.cpp"><Filter>Arquivos de Origem\imgui\backends</Filter></ClCompile>
+    <ClCompile Include="AuthClient.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Config.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
-    <ClCompile Include="Crypt.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="DownloadManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="DownloadPolicy.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="DownloadTelemetry.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="EndpointManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="FileVerifier.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="GameLauncher.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
-    <ClCompile Include="Helper.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Integrity.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Language.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherApplication.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
@@ -33,7 +32,6 @@
     <ClCompile Include="LauncherState.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherUpdater.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherView.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
-    <ClCompile Include="LauncherWebView.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherWindow.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Main.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="ManifestManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
@@ -52,8 +50,8 @@
     <ClInclude Include="..\..\Libs\imgui\imstb_truetype.h"><Filter>Arquivos de Cabeçalho\imgui</Filter></ClInclude>
     <ClInclude Include="..\..\Libs\imgui\backends\imgui_impl_dx9.h"><Filter>Arquivos de Cabeçalho\imgui\backends</Filter></ClInclude>
     <ClInclude Include="..\..\Libs\imgui\backends\imgui_impl_win32.h"><Filter>Arquivos de Cabeçalho\imgui\backends</Filter></ClInclude>
+    <ClInclude Include="AuthClient.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="Config.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
-    <ClInclude Include="Crypt.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="DownloadManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="DownloadPolicy.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="DownloadTelemetry.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
@@ -69,7 +67,6 @@
     <ClInclude Include="LauncherState.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="LauncherUpdater.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="LauncherView.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
-    <ClInclude Include="LauncherWebView.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="LauncherWindow.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="ManifestManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="ManifestSecurity.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>

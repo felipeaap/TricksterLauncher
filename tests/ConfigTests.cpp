@@ -75,12 +75,12 @@ void RunConfigTests()
 
     // ── Test 4: Partial JSON only updates specified fields ───────────────────
     {
-        const char* json = R"({ "dll_inject": true, "dll_name": "Test.dll" })";
+        const char* json = R"({ "region": "japan", "game_exec": "Bin/game.bin" })";
         const std::wstring dir = WriteTempConfig(json);
         const std::string cdnBefore = config::LauncherCDN;
         config::Load(dir);
-        assert(config::IsDllInjectEnable == true);
-        assert(config::InjectDLLName == "Test.dll");
+        assert(config::Region == "japan");
+        assert(config::GameExecName == "Bin/game.bin");
         assert(config::LauncherCDN == cdnBefore && "Other fields must remain unchanged");
         RemoveTempConfig();
     }

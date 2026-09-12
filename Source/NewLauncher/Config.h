@@ -8,12 +8,15 @@ namespace config
     extern std::string SubTitle;
     extern std::string LauncherCDN;
     extern std::vector<std::string> LauncherCDNBackups;
-    extern std::wstring BaseNewsURL;
     extern std::string OptionExecName;
+    extern std::string GameExecName;
+    extern std::string Region;
     extern std::string WebsiteLink;
     extern bool IsCDNUsingSSL;
-    extern bool IsDllInjectEnable;
-    extern std::string InjectDLLName;
+
+    // Authentication endpoint (launcher_auth.php)
+    extern std::string AuthEndpointURL;
+    extern std::string AuthToken;
 
     // Signed consolidated manifest migration.
     extern bool ManifestRequireSignature;

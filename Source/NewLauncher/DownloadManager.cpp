@@ -18,6 +18,22 @@
 
 namespace
 {
+void CleanTemporaryDownloadFiles(const std::filesystem::path& destination)
+{
+    std::error_code ec;
+    const std::filesystem::path partPath   = destination.string() + ".part";
+    const std::filesystem::path metaPath   = destination.string() + ".part.meta";
+    const std::filesystem::path tmpPath    = metaPath.string() + ".tmp";
+    const std::filesystem::path bakPath    = destination.string() + ".bak";
+    const std::filesystem::path backupPath = destination.string() + ".backup";
+
+    std::filesystem::remove(partPath, ec);   ec.clear();
+    std::filesystem::remove(metaPath, ec);   ec.clear();
+    std::filesystem::remove(tmpPath, ec);    ec.clear();
+    std::filesystem::remove(bakPath, ec);    ec.clear();
+    std::filesystem::remove(backupPath, ec); ec.clear();
+}
+
 struct RemoteInfo
 {
     long long size = -1;
@@ -787,6 +803,7 @@ bool DownloadManager::Download(const std::string& remotePath,
 
     if (!success)
     {
+        CleanTemporaryDownloadFiles(destination);
         if (errorCallback)
             errorCallback("Download failed for: " + remotePath);
         return false;
@@ -795,6 +812,7 @@ bool DownloadManager::Download(const std::string& remotePath,
     std::error_code error;
     if (!std::filesystem::exists(partPath, error))
     {
+        CleanTemporaryDownloadFiles(destination);
         if (errorCallback)
             errorCallback("Downloaded file missing part file for: " + remotePath);
         return false;
@@ -803,22 +821,40 @@ bool DownloadManager::Download(const std::string& remotePath,
     const auto downloadedBytes = static_cast<long long>(std::filesystem::file_size(partPath, error));
     if (info.size > 0 && downloadedBytes != info.size)
     {
+        CleanTemporaryDownloadFiles(destination);
         if (errorCallback)
             errorCallback("Downloaded file size mismatch for: " + remotePath);
         return false;
     }
 
-    std::filesystem::remove(destination, error);
-    error.clear();
+    if (std::filesystem::exists(destination, error))
+    {
+        SetFileAttributesW(destination.c_str(), FILE_ATTRIBUTE_NORMAL);
+        std::filesystem::remove(destination, error);
+        error.clear();
+    }
+
     std::filesystem::rename(partPath, destination, error);
     if (error)
     {
-        if (errorCallback)
-            errorCallback("Failed to move completed part file to final destination: " + destination.string());
-        return false;
+        error.clear();
+        std::filesystem::copy_file(
+            partPath,
+            destination,
+            std::filesystem::copy_options::overwrite_existing,
+            error);
+
+        if (error)
+        {
+            CleanTemporaryDownloadFiles(destination);
+            if (errorCallback)
+                errorCallback("Failed to move completed part file to final destination: " + destination.string());
+            return false;
+        }
     }
 
-    std::filesystem::remove(metadataPath, error);
+    CleanTemporaryDownloadFiles(destination);
+
     if (progress)
         progress(downloadedBytes, downloadedBytes);
     if (speed)

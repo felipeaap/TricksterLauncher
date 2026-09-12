@@ -14,52 +14,17 @@ GameLauncher::GameLauncher(Options options)
 {
 }
 
-std::filesystem::path GameLauncher::ResolveGamePath(const std::filesystem::path& launcherDirectory)
+std::filesystem::path GameLauncher::ResolveGamePath(
+    const std::filesystem::path& launcherDirectory,
+    const std::string& gameExecPath)
 {
-    return launcherDirectory / kGameExecutable;
-}
-
-bool GameLauncher::InjectDLL(HANDLE process, const std::string& dllPath) const
-{
-    if (!process || dllPath.empty())
-        return false;
-
-    const SIZE_T size = dllPath.size() + 1;
-    LPVOID remoteMemory = VirtualAllocEx(process, nullptr, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    if (!remoteMemory)
-        return false;
-
-    const BOOL written = WriteProcessMemory(
-        process, remoteMemory, dllPath.c_str(), size, nullptr);
-    if (!written)
-    {
-        VirtualFreeEx(process, remoteMemory, 0, MEM_RELEASE);
-        return false;
-    }
-
-    HANDLE thread = CreateRemoteThread(
-        process,
-        nullptr,
-        0,
-        reinterpret_cast<LPTHREAD_START_ROUTINE>(LoadLibraryA),
-        remoteMemory,
-        0,
-        nullptr);
-    if (!thread)
-    {
-        VirtualFreeEx(process, remoteMemory, 0, MEM_RELEASE);
-        return false;
-    }
-
-    WaitForSingleObject(thread, INFINITE);
-    CloseHandle(thread);
-    VirtualFreeEx(process, remoteMemory, 0, MEM_RELEASE);
-    return true;
+    const std::string relativePath = gameExecPath.empty() ? "Trickster/trickster.bin" : gameExecPath;
+    return launcherDirectory / relativePath;
 }
 
 bool GameLauncher::Launch(const std::filesystem::path& launcherDirectory) const
 {
-    const std::filesystem::path gamePath = ResolveGamePath(launcherDirectory);
+    const std::filesystem::path gamePath = ResolveGamePath(launcherDirectory, options_.gameExecPath);
     const std::string executable = gamePath.string();
 
     std::string cmdLine = "\"" + executable + "\"";
@@ -69,11 +34,8 @@ bool GameLauncher::Launch(const std::filesystem::path& launcherDirectory) const
     }
     else if (!options_.account.empty())
     {
-        cmdLine += " /account:" + options_.account;
-        if (!options_.password.empty())
-        {
-            cmdLine += " /password:" + options_.password;
-        }
+        const std::string region = options_.region.empty() ? "thailand" : options_.region;
+        cmdLine += " 1," + options_.account + "," + options_.password + ",0," + region + ",|";
     }
 
     std::vector<char> cmdBuffer(cmdLine.begin(), cmdLine.end());
@@ -98,17 +60,7 @@ bool GameLauncher::Launch(const std::filesystem::path& launcherDirectory) const
         return false;
     }
 
-    bool success = true;
-    if (options_.injectDll)
-    {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(options_.injectionDelayMilliseconds));
-        success = InjectDLL(processInfo.hProcess, options_.dllPath);
-        if (!success)
-            TerminateProcess(processInfo.hProcess, 0);
-    }
-
     CloseHandle(processInfo.hThread);
     CloseHandle(processInfo.hProcess);
-    return success;
+    return true;
 }

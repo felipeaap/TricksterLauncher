@@ -9,21 +9,19 @@ class GameLauncher
 public:
     struct Options
     {
-        bool injectDll = false;
-        std::string dllPath;
-        DWORD injectionDelayMilliseconds = 2000;
         std::string commandLineArgs;
         std::string account;
         std::string password;
+        std::string gameExecPath;
+        std::string region;
     };
 
     explicit GameLauncher(Options options = {});
 
     bool Launch(const std::filesystem::path& launcherDirectory) const;
-    bool InjectDLL(HANDLE process, const std::string& dllPath) const;
 
 private:
-    static std::filesystem::path ResolveGamePath(const std::filesystem::path& launcherDirectory);
+    static std::filesystem::path ResolveGamePath(const std::filesystem::path& launcherDirectory, const std::string& gameExecPath = {});
 
     Options options_;
 };

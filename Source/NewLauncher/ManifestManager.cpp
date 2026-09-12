@@ -95,60 +95,21 @@ int ManifestManager::Load(FileList& files, bool isFullCheck, int& localVersion)
                 LoadFilesFromArray(document.value("files", nlohmann::json::array()), files);
                 return manifestVersion;
             }
-            else if (config::ManifestRequireSignature)
+            else
             {
-                // Strict mode: signature validation failed on consolidated manifest.
-                // Fail-closed immediately.
                 files.clear();
                 return localVersion;
             }
         }
-        else if (config::ManifestRequireSignature)
-        {
-            // Strict mode: manifest.json is missing or inaccessible.
-            // Fail-closed immediately.
-            files.clear();
-            return localVersion;
-        }
     }
     catch (const nlohmann::json::exception&)
-    {
-        files.clear();
-        if (config::ManifestRequireSignature)
-            return localVersion;
-    }
-
-    // Fallback: legacy versioned manifests (only allowed when signature is not strictly required)
-    if (config::ManifestRequireSignature)
     {
         files.clear();
         return localVersion;
     }
 
     files.clear();
-    int currentVersion = localVersion;
-    while (true)
-    {
-        const std::string path = "/version/version_" + std::to_string(currentVersion) + ".json";
-        const std::string jsonContent = fetch_(path);
-        if (jsonContent.empty())
-            break;
-
-        try
-        {
-            const nlohmann::json document = nlohmann::json::parse(jsonContent);
-            if (document.is_array())
-                LoadFilesFromArray(document, files);
-        }
-        catch (const nlohmann::json::exception&)
-        {
-            break;
-        }
-
-        ++currentVersion;
-    }
-
-    return currentVersion;
+    return localVersion;
 }
 
 bool ManifestManager::IsSamePath(const std::string& left, const std::string& right)
