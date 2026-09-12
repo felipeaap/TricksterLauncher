@@ -734,7 +734,9 @@ void LauncherView::Render(
 
         // Logo Icon & Title
         const char* titleText = "Trickster Online";
+        ImVec2 titleDim(0, 0);
         if (fontBold_) ImGui::PushFont(fontBold_);
+        titleDim = ImGui::CalcTextSize(titleText);
         dl->AddText(ImVec2(16, 8), IM_COL32(15, 23, 42, 255), titleText);
         if (fontBold_) ImGui::PopFont();
 
@@ -762,20 +764,23 @@ void LauncherView::Render(
             baseDotCol = IM_COL32(239, 68, 68, 255); // Red for Maintenance
         }
 
-        const float pillX = 142.0f;
+        const float pillX = 16.0f + titleDim.x + 12.0f;
         if (fontSmall_) ImGui::PushFont(fontSmall_);
         const ImVec2 textDim = ImGui::CalcTextSize(statusText);
         const float pillWidth = textDim.x + 28.0f;
+        const float pillY0 = 6.0f;
+        const float pillY1 = 28.0f;
+        const float pillMidY = (pillY0 + pillY1) * 0.5f;
 
         // Pill background & border
         dl->AddRectFilled(
-            ImVec2(pillX, 6),
-            ImVec2(pillX + pillWidth, 28),
+            ImVec2(pillX, pillY0),
+            ImVec2(pillX + pillWidth, pillY1),
             bgCol,
             11.0f);
         dl->AddRect(
-            ImVec2(pillX, 6),
-            ImVec2(pillX + pillWidth, 28),
+            ImVec2(pillX, pillY0),
+            ImVec2(pillX + pillWidth, pillY1),
             borderCol,
             11.0f,
             0,
@@ -788,11 +793,12 @@ void LauncherView::Render(
         const int dotG = (baseDotCol >> IM_COL32_G_SHIFT) & 0xFF;
         const int dotB = (baseDotCol >> IM_COL32_B_SHIFT) & 0xFF;
         const ImU32 dotCol = IM_COL32(dotR, dotG, dotB, static_cast<int>(pulseDot));
-        dl->AddCircleFilled(ImVec2(pillX + 9.5f, 17), 3.5f, dotCol);
+        dl->AddCircleFilled(ImVec2(pillX + 9.5f, pillMidY), 3.5f, dotCol);
 
-        // Text
+        // Text vertically centered
+        const float textY = pillY0 + (pillY1 - pillY0 - textDim.y) * 0.5f;
         dl->AddText(
-            ImVec2(pillX + 18.0f, 9.0f),
+            ImVec2(pillX + 18.0f, textY),
             textCol,
             statusText);
         if (fontSmall_) ImGui::PopFont();

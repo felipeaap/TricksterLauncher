@@ -38,6 +38,7 @@ public:
 
 private:
     std::vector<std::string> GetEndpoints() const;
+    bool FetchFromCDN(const std::string& path, std::string& outBody) const;
     std::string FetchFromCDN(const std::string& path) const;
     void CheckUpdatesAsync(bool isFullCheck);
     bool RunInstaller(const std::vector<Arquivo>& files, int pendingUpdateCount);

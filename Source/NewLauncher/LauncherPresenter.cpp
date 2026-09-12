@@ -40,10 +40,17 @@ std::vector<std::string> LauncherPresenter::GetEndpoints() const
     return endpoints;
 }
 
-std::string LauncherPresenter::FetchFromCDN(const std::string& path) const
+bool LauncherPresenter::FetchFromCDN(const std::string& path, std::string& outBody) const
 {
     EndpointManager endpoints(GetEndpoints(), config::IsCDNUsingSSL);
-    return endpoints.Get(path);
+    return endpoints.Fetch(path, outBody);
+}
+
+std::string LauncherPresenter::FetchFromCDN(const std::string& path) const
+{
+    std::string body;
+    FetchFromCDN(path, body);
+    return body;
 }
 
 std::filesystem::path LauncherPresenter::GetGamePath() const
@@ -254,17 +261,24 @@ void LauncherPresenter::CheckSelfUpdate()
     std::filesystem::remove(launcherPath.string() + ".new.part.meta", ec); ec.clear();
 
     LauncherUpdater updater(GetEndpoints(), config::IsCDNUsingSSL);
-    const std::string remoteLauncherHash = FetchFromCDN("/launcher.txt");
-    if (remoteLauncherHash.empty())
+    std::string remoteLauncherHash;
+    if (FetchFromCDN("/launcher.txt", remoteLauncherHash))
     {
-        return;
-    }
+        if (LauncherState::serverStatus.load(std::memory_order_relaxed) == ServerStatus::Unknown &&
+            !isMaintenance_.load(std::memory_order_acquire))
+        {
+            LauncherState::SetServerStatus(ServerStatus::Online);
+        }
 
-    updater.Update(
-        launcherPath,
-        remoteLauncherHash,
-        launcherName,
-        currentExe);
+        if (!remoteLauncherHash.empty())
+        {
+            updater.Update(
+                launcherPath,
+                remoteLauncherHash,
+                launcherName,
+                currentExe);
+        }
+    }
 }
 
 void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
@@ -287,9 +301,16 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
                 std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
                 LauncherState::fileString = lang::GetString("launcher_waiting_server");
             }
+            LauncherState::SetServerStatus(ServerStatus::Unknown);
 
-            // Check maintenance status from CDN
-            const std::string maintenanceResponse = FetchFromCDN("/maintenance.txt");
+            // 1. Check maintenance status from CDN
+            std::string maintenanceResponse;
+            const bool maintenanceFetched = FetchFromCDN("/maintenance.txt", maintenanceResponse);
+
+            // Trim whitespace
+            maintenanceResponse.erase(maintenanceResponse.find_last_not_of(" \n\r\t") + 1);
+            maintenanceResponse.erase(0, maintenanceResponse.find_first_not_of(" \n\r\t"));
+
             const bool maint = (maintenanceResponse == "true");
             isMaintenance_.store(maint, std::memory_order_release);
             LauncherState::SetMaintenance(maint);
@@ -304,16 +325,28 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
                 return;
             }
 
-            // Received server response and confirmed not in maintenance
-            LauncherState::SetServerStatus(ServerStatus::Online);
+            if (maintenanceFetched)
+            {
+                LauncherState::SetServerStatus(ServerStatus::Online);
+            }
 
-            // Check self-update
+            // 2. Check self-update
             CheckSelfUpdate();
 
+            // 3. Coordinator check
             UpdateCoordinator coordinator(
                 [this](const std::string& path)
                 {
-                    return FetchFromCDN(path);
+                    std::string body;
+                    if (FetchFromCDN(path, body))
+                    {
+                        if (LauncherState::serverStatus.load(std::memory_order_relaxed) == ServerStatus::Unknown)
+                        {
+                            LauncherState::SetServerStatus(ServerStatus::Online);
+                        }
+                        return body;
+                    }
+                    return std::string();
                 },
                 [](const std::string& fileName)
                 {
@@ -339,6 +372,16 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
                 localVersion_,
                 currentVersion_,
                 updateCount_);
+
+            // If no endpoint response was ever received, server status remains Unknown
+            if (LauncherState::serverStatus.load(std::memory_order_relaxed) == ServerStatus::Unknown)
+            {
+                std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
+                LauncherState::fileString = lang::GetString("launcher_update_check_fail");
+                isWorkerDone_.store(false, std::memory_order_release);
+                isRunning_.store(false, std::memory_order_release);
+                return;
+            }
 
             const bool success = RunInstaller(fileList_, updateCount_);
             isWorkerDone_.store(success, std::memory_order_release);

@@ -50,7 +50,7 @@ struct SegmentState
 };
 
 template <typename Client>
-std::string GetImpl(Client& client, const std::string& path, int timeoutSeconds)
+bool FetchImpl(Client& client, const std::string& path, std::string& outBody, int timeoutSeconds)
 {
     client.set_follow_location(true);
     client.set_connection_timeout(timeoutSeconds, 0);
@@ -59,9 +59,21 @@ std::string GetImpl(Client& client, const std::string& path, int timeoutSeconds)
 
     const auto response = client.Get(path.c_str());
     if (!response || response->status != 200)
-        return {};
+    {
+        outBody.clear();
+        return false;
+    }
 
-    return response->body;
+    outBody = response->body;
+    return true;
+}
+
+template <typename Client>
+std::string GetImpl(Client& client, const std::string& path, int timeoutSeconds)
+{
+    std::string body;
+    FetchImpl(client, path, body, timeoutSeconds);
+    return body;
 }
 
 bool ParseContentRange(const std::string& value, long long& total)
@@ -727,16 +739,23 @@ DownloadManager::DownloadManager(std::string host, bool useSsl, Options options)
         options_.segmentSizeBytes = 4LL * 1024 * 1024;
 }
 
-std::string DownloadManager::Get(const std::string& path) const
+bool DownloadManager::Fetch(const std::string& path, std::string& outBody) const
 {
     if (useSsl_)
     {
         httplib::SSLClient client(host_.c_str());
-        return GetImpl(client, path, options_.connectionTimeoutSeconds);
+        return FetchImpl(client, path, outBody, options_.connectionTimeoutSeconds);
     }
 
     httplib::Client client(host_.c_str());
-    return GetImpl(client, path, options_.connectionTimeoutSeconds);
+    return FetchImpl(client, path, outBody, options_.connectionTimeoutSeconds);
+}
+
+std::string DownloadManager::Get(const std::string& path) const
+{
+    std::string body;
+    Fetch(path, body);
+    return body;
 }
 
 bool DownloadManager::Download(const std::string& remotePath,

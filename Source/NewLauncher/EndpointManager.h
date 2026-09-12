@@ -12,6 +12,7 @@ public:
                     bool useSsl,
                     DownloadManager::Options options = {});
 
+    bool Fetch(const std::string& path, std::string& outBody) const;
     std::string Get(const std::string& path) const;
     bool Download(const std::string& remotePath,
                   const std::string& localPath,

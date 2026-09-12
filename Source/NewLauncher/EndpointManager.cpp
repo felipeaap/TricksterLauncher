@@ -29,7 +29,7 @@ EndpointManager::EndpointManager(std::vector<std::string> hosts,
 {
 }
 
-std::string EndpointManager::Get(const std::string& path) const
+bool EndpointManager::Fetch(const std::string& path, std::string& outBody) const
 {
     for (const auto& host : hosts_)
     {
@@ -37,12 +37,19 @@ std::string EndpointManager::Get(const std::string& path) const
             continue;
 
         DownloadManager manager(host, useSsl_, options_);
-        const std::string result = manager.Get(path);
-        if (!result.empty())
-            return result;
+        if (manager.Fetch(path, outBody))
+            return true;
     }
 
-    return {};
+    outBody.clear();
+    return false;
+}
+
+std::string EndpointManager::Get(const std::string& path) const
+{
+    std::string result;
+    Fetch(path, result);
+    return result;
 }
 
 bool EndpointManager::Download(const std::string& remotePath,
