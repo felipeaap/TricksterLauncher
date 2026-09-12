@@ -14,9 +14,12 @@ namespace config
     extern std::string Language;
     extern bool IsCDNUsingSSL;
 
-    // Authentication endpoint (launcher_auth.php)
+    // Authentication endpoint (auth.php / launcher_auth.php)
     extern std::string AuthEndpointURL;
     extern std::string AuthToken;
+
+    /// Automatically resolves the auth endpoint URL from LauncherCDN if not explicitly configured.
+    std::string GetResolvedAuthEndpointURL() noexcept;
 
     // Signed consolidated manifest migration.
     extern bool ManifestRequireSignature;

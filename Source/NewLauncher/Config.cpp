@@ -16,11 +16,36 @@ namespace config
     std::string Region                  = "thailand";
     std::string Language                = "en-us";
     bool IsCDNUsingSSL                  = false;
-    std::string AuthEndpointURL         = "https://meuserver.com/endpoints/launcher_auth.php";
+    std::string AuthEndpointURL         = "";
     std::string AuthToken               = "";
     bool ManifestRequireSignature       = false;
     std::string ManifestPublicKeyPem    = {};
     std::vector<std::string> PinnedCertificateHashes = {};
+
+    std::string GetResolvedAuthEndpointURL() noexcept
+    {
+        if (!AuthEndpointURL.empty())
+            return AuthEndpointURL;
+
+        if (LauncherCDN.empty())
+            return "";
+
+        std::string url;
+        if (LauncherCDN.rfind("http://", 0) == 0 || LauncherCDN.rfind("https://", 0) == 0)
+        {
+            url = LauncherCDN;
+        }
+        else
+        {
+            url = (IsCDNUsingSSL ? "https://" : "http://") + LauncherCDN;
+        }
+
+        if (url.back() != '/')
+            url += '/';
+
+        url += "auth.php";
+        return url;
+    }
 
     void Load(const std::wstring& exeDir) noexcept
     {

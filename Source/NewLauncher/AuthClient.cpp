@@ -91,16 +91,17 @@ ParsedUrl ParseUrl(const std::string& url)
 
 AuthResponse Authenticate(const std::string& username, const std::string& password)
 {
-    if (config::AuthEndpointURL.empty() || config::AuthToken.empty())
+    const std::string endpointUrl = config::GetResolvedAuthEndpointURL();
+    if (endpointUrl.empty() || config::AuthToken.empty())
     {
-        Logger::LogError("AuthClient: AuthEndpointURL or AuthToken not configured.");
+        Logger::LogError("AuthClient: AuthEndpointURL (or LauncherCDN) or AuthToken not configured.");
         return { AuthResult::NotConfigured, "Authentication not configured." };
     }
 
-    const ParsedUrl parsed = ParseUrl(config::AuthEndpointURL);
+    const ParsedUrl parsed = ParseUrl(endpointUrl);
     if (parsed.host.empty())
     {
-        Logger::LogError("AuthClient: invalid AuthEndpointURL: " + config::AuthEndpointURL);
+        Logger::LogError("AuthClient: invalid AuthEndpointURL: " + endpointUrl);
         return { AuthResult::ServiceUnavailable, "Login service unavailable." };
     }
 
@@ -132,7 +133,7 @@ AuthResponse Authenticate(const std::string& username, const std::string& passwo
 
             if (!res)
             {
-                Logger::LogError("AuthClient: SSL request failed to " + config::AuthEndpointURL);
+                Logger::LogError("AuthClient: SSL request failed to " + endpointUrl);
                 return { AuthResult::ServiceUnavailable, "Login service unavailable." };
             }
             httpStatus  = res->status;
@@ -152,7 +153,7 @@ AuthResponse Authenticate(const std::string& username, const std::string& passwo
 
             if (!res)
             {
-                Logger::LogError("AuthClient: request failed to " + config::AuthEndpointURL);
+                Logger::LogError("AuthClient: request failed to " + endpointUrl);
                 return { AuthResult::ServiceUnavailable, "Login service unavailable." };
             }
             httpStatus  = res->status;
