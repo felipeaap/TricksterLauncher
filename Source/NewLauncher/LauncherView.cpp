@@ -1113,12 +1113,23 @@ void LauncherView::LoadHeroTexture(IDirect3DDevice9* device, const std::wstring&
     if (!heroExeDir_.empty())
     {
         const std::filesystem::path dir(heroExeDir_);
+        const std::filesystem::path heroDir = dir / L"LauncherData" / L"assets" / L"hero";
+        candidatePaths.push_back(heroDir / L"hero.png");
+        candidatePaths.push_back(heroDir / L"hero.jpg");
+        candidatePaths.push_back(heroDir / L"hero.jpeg");
+        candidatePaths.push_back(heroDir / L"hero_banner.png");
+        candidatePaths.push_back(heroDir / L"hero_banner.jpg");
         candidatePaths.push_back(dir / L"hero.png");
         candidatePaths.push_back(dir / L"hero.jpg");
         candidatePaths.push_back(dir / L"hero.jpeg");
         candidatePaths.push_back(dir / L"hero_banner.png");
         candidatePaths.push_back(dir / L"hero_banner.jpg");
     }
+    candidatePaths.push_back(L"LauncherData/assets/hero/hero.png");
+    candidatePaths.push_back(L"LauncherData/assets/hero/hero.jpg");
+    candidatePaths.push_back(L"LauncherData/assets/hero/hero.jpeg");
+    candidatePaths.push_back(L"LauncherData/assets/hero/hero_banner.png");
+    candidatePaths.push_back(L"LauncherData/assets/hero/hero_banner.jpg");
     candidatePaths.push_back(L"hero.png");
     candidatePaths.push_back(L"hero.jpg");
     candidatePaths.push_back(L"hero.jpeg");
