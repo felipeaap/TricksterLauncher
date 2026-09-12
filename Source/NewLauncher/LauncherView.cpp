@@ -739,20 +739,44 @@ void LauncherView::Render(
         if (fontBold_) ImGui::PopFont();
 
         // Server Status Tag Pill
-        const bool isMaint = (state.fileString == lang::GetString("launcher_worker_maintenance"));
-        const char* statusText = isMaint ? "Maintenance" : "Server Online";
-        const float pillX = 142.0f;
+        const char* statusText = "Unknown";
+        ImU32 bgCol = IM_COL32(241, 245, 249, 240);
+        ImU32 borderCol = IM_COL32(203, 213, 225, 220);
+        ImU32 textCol = IM_COL32(100, 116, 139, 255);
+        ImU32 baseDotCol = IM_COL32(245, 158, 11, 255); // Amber for Unknown/Connecting
 
-        // Pill background
+        if (state.serverStatus == ServerStatus::Online)
+        {
+            statusText = "Server Online";
+            bgCol = IM_COL32(238, 242, 255, 240);
+            borderCol = IM_COL32(165, 180, 252, 220);
+            textCol = IM_COL32(29, 78, 216, 255);
+            baseDotCol = IM_COL32(16, 185, 129, 255); // Green for Online
+        }
+        else if (state.serverStatus == ServerStatus::Maintenance)
+        {
+            statusText = "Maintenance";
+            bgCol = IM_COL32(254, 226, 226, 240);
+            borderCol = IM_COL32(248, 113, 113, 220);
+            textCol = IM_COL32(220, 38, 38, 255);
+            baseDotCol = IM_COL32(239, 68, 68, 255); // Red for Maintenance
+        }
+
+        const float pillX = 142.0f;
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        const ImVec2 textDim = ImGui::CalcTextSize(statusText);
+        const float pillWidth = textDim.x + 28.0f;
+
+        // Pill background & border
         dl->AddRectFilled(
             ImVec2(pillX, 6),
-            ImVec2(pillX + 104, 28),
-            isMaint ? IM_COL32(254, 226, 226, 240) : IM_COL32(238, 242, 255, 240),
+            ImVec2(pillX + pillWidth, 28),
+            bgCol,
             11.0f);
         dl->AddRect(
             ImVec2(pillX, 6),
-            ImVec2(pillX + 104, 28),
-            isMaint ? IM_COL32(248, 113, 113, 220) : IM_COL32(165, 180, 252, 220),
+            ImVec2(pillX + pillWidth, 28),
+            borderCol,
             11.0f,
             0,
             1.0f);
@@ -760,15 +784,16 @@ void LauncherView::Render(
         // Glowing indicator circle
         const float t = static_cast<float>(ImGui::GetTime());
         const float pulseDot = (sinf(t * 4.0f) * 0.5f + 0.5f) * 55.0f + 200.0f;
-        ImU32 dotCol = isMaint
-            ? IM_COL32(239, 68, 68, static_cast<int>(pulseDot))
-            : IM_COL32(16, 185, 129, static_cast<int>(pulseDot));
-        dl->AddCircleFilled(ImVec2(pillX + 9, 17), 3.5f, dotCol);
+        const int dotR = (baseDotCol >> IM_COL32_R_SHIFT) & 0xFF;
+        const int dotG = (baseDotCol >> IM_COL32_G_SHIFT) & 0xFF;
+        const int dotB = (baseDotCol >> IM_COL32_B_SHIFT) & 0xFF;
+        const ImU32 dotCol = IM_COL32(dotR, dotG, dotB, static_cast<int>(pulseDot));
+        dl->AddCircleFilled(ImVec2(pillX + 9.5f, 17), 3.5f, dotCol);
 
-        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        // Text
         dl->AddText(
-            ImVec2(pillX + 17, 9.0f),
-            isMaint ? IM_COL32(220, 38, 38, 255) : IM_COL32(29, 78, 216, 255),
+            ImVec2(pillX + 18.0f, 9.0f),
+            textCol,
             statusText);
         if (fontSmall_) ImGui::PopFont();
 

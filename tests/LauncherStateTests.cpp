@@ -38,8 +38,14 @@ void RunLauncherStateTests()
         assert(snap.isOptionEnabled == false);
 
         LauncherState::SetMaintenance(true);
+        LauncherState::SetServerStatus(ServerStatus::Maintenance);
         snap = LauncherState::GetSnapshot();
         assert(snap.isMaintenance == true);
+        assert(snap.serverStatus == ServerStatus::Maintenance);
+
+        LauncherState::SetServerStatus(ServerStatus::Online);
+        snap = LauncherState::GetSnapshot();
+        assert(snap.serverStatus == ServerStatus::Online);
     }
 
     // Test 4: Concurrency test with multiple threads mutating & reading snapshots

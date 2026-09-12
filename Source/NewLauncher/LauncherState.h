@@ -4,6 +4,13 @@
 #include <mutex>
 #include <string>
 
+enum class ServerStatus
+{
+    Unknown = 0,
+    Online = 1,
+    Maintenance = 2
+};
+
 /// Snapshot of the state passed directly to the view for rendering.
 struct LauncherViewState
 {
@@ -15,6 +22,7 @@ struct LauncherViewState
     bool isCheckEnabled = false;
     bool isOptionEnabled = false;
     bool isMaintenance = false;
+    ServerStatus serverStatus = ServerStatus::Unknown;
 };
 
 /// Shared launcher state written by worker/presenter threads and read by the render thread.
@@ -43,6 +51,7 @@ namespace LauncherState
     extern std::atomic<bool> isCheckEnabled;
     extern std::atomic<bool> isOptionEnabled;
     extern std::atomic<bool> isMaintenance;
+    extern std::atomic<ServerStatus> serverStatus;
 
     /// Obtains a consistent snapshot for the view layer.
     LauncherViewState GetSnapshot();
@@ -53,4 +62,5 @@ namespace LauncherState
     void SetSpeed(const std::string& speed);
     void SetButtons(bool game, bool check, bool option);
     void SetMaintenance(bool maintenance);
+    void SetServerStatus(ServerStatus status);
 }

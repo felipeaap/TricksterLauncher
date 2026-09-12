@@ -13,6 +13,7 @@ namespace LauncherState
     std::atomic<bool> isCheckEnabled{ false };
     std::atomic<bool> isOptionEnabled{ false };
     std::atomic<bool> isMaintenance{ false };
+    std::atomic<ServerStatus> serverStatus{ ServerStatus::Unknown };
 
     LauncherViewState GetSnapshot()
     {
@@ -34,6 +35,7 @@ namespace LauncherState
         state.isCheckEnabled = isCheckEnabled.load(std::memory_order_relaxed);
         state.isOptionEnabled = isOptionEnabled.load(std::memory_order_relaxed);
         state.isMaintenance = isMaintenance.load(std::memory_order_relaxed);
+        state.serverStatus = serverStatus.load(std::memory_order_relaxed);
 
         return state;
     }
@@ -66,5 +68,10 @@ namespace LauncherState
     void SetMaintenance(bool maintenance)
     {
         isMaintenance.store(maintenance, std::memory_order_relaxed);
+    }
+
+    void SetServerStatus(ServerStatus status)
+    {
+        serverStatus.store(status, std::memory_order_relaxed);
     }
 }

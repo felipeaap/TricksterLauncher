@@ -55,7 +55,8 @@ std::filesystem::path LauncherPresenter::GetGamePath() const
 
 void LauncherPresenter::Initialize() noexcept
 {
-    LauncherState::SetStatus(lang::GetString("launcher_checking"));
+    LauncherState::SetServerStatus(ServerStatus::Unknown);
+    LauncherState::SetStatus(lang::GetString("launcher_waiting_server"));
     LauncherState::SetSpeed("");
     LauncherState::SetProgress(0.0f, 0.0f);
     LauncherState::SetButtons(false, false, false);
@@ -281,23 +282,33 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
     {
         try
         {
-            // Check maintenance status
+            // Initial state: waiting for server response
+            {
+                std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
+                LauncherState::fileString = lang::GetString("launcher_waiting_server");
+            }
+
+            // Check maintenance status from CDN
             const std::string maintenanceResponse = FetchFromCDN("/maintenance.txt");
             const bool maint = (maintenanceResponse == "true");
             isMaintenance_.store(maint, std::memory_order_release);
             LauncherState::SetMaintenance(maint);
 
-            // Check self-update
-            CheckSelfUpdate();
-
             if (maint)
             {
+                LauncherState::SetServerStatus(ServerStatus::Maintenance);
                 std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
                 LauncherState::fileString = lang::GetString("launcher_worker_maintenance");
                 isWorkerDone_.store(true, std::memory_order_release);
                 isRunning_.store(false, std::memory_order_release);
                 return;
             }
+
+            // Received server response and confirmed not in maintenance
+            LauncherState::SetServerStatus(ServerStatus::Online);
+
+            // Check self-update
+            CheckSelfUpdate();
 
             UpdateCoordinator coordinator(
                 [this](const std::string& path)

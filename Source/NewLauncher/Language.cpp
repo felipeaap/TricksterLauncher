@@ -5,6 +5,8 @@ namespace lang
     Dictionary Languages = 
     {
         {"splash_check",                 "Verifying file: "},
+        {"launcher_waiting_server",      "Waiting for server response..."},
+        {"launcher_checking",            "Connecting to server..."},
         {"launcher_worker_complete",     "Update complete!"},
         {"launcher_worker_maintenance",  "In Maintenance!"},
         {"launcher_worker_downloading",  "Downloading"},
