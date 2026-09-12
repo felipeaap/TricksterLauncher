@@ -11,7 +11,6 @@ namespace config
     std::string SubTitle                = "Trickster Launcher";
     std::string LauncherCDN             = "127.0.0.1:8000";
     std::vector<std::string> LauncherCDNBackups = {};
-    std::string WebsiteLink             = "http://127.0.0.1:8000";
     std::string OptionExecName          = "apps/Setup.exe";
     std::string GameExecName            = "Trickster/trickster.bin";
     std::string Region                  = "thailand";
@@ -76,7 +75,6 @@ namespace config
             getWString("window_title",  WindowTitle);
             getString ("subtitle",      SubTitle);
             getString ("cdn",           LauncherCDN);
-            getString ("website_link",  WebsiteLink);
             getString ("option_exec",   OptionExecName);
             getString ("game_exec",     GameExecName);
             getString ("region",        Region);

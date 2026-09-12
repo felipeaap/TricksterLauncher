@@ -7,7 +7,6 @@
     "patch-mirror2.example.com"
   ],
   "use_ssl": true,
-  "website_link": "https://example.com",
   "option_exec": "Setup.exe",
   "game_exec": "Trickster/trickster.bin",
   "region": "thailand",

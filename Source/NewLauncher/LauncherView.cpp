@@ -989,18 +989,6 @@ void LauncherView::RenderLoginForm(
             events.onConnectClicked(accountBuffer_, passwordBuffer_, rememberAccount_);
         }
     }
-
-    // 5. Footer: Website Link
-    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 114));
-    if (fontRegular_) ImGui::PushFont(fontRegular_);
-    ImGui::TextColored(ImVec4(0.12f, 0.16f, 0.23f, 1.0f), "%s", lang::GetString("launcher_site_desc").c_str());
-
-    ImGui::SameLine(0, 6.0f);
-    RenderLink(
-        lang::GetString("launcher_site_click").c_str(),
-        config::WebsiteLink.c_str(),
-        events.onLinkClicked);
-    if (fontRegular_) ImGui::PopFont();
 }
 
 void LauncherView::Render(
@@ -1391,18 +1379,6 @@ void LauncherView::Render(
             }
 
             if (fontBold_) ImGui::PopFont();
-
-            // 5. Footer: Website Link
-            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 98));
-            if (fontRegular_) ImGui::PushFont(fontRegular_);
-            ImGui::TextColored(ImVec4(0.12f, 0.16f, 0.23f, 1.0f), "%s", lang::GetString("launcher_site_desc").c_str());
-
-            ImGui::SameLine(0, 6.0f);
-            RenderLink(
-                lang::GetString("launcher_site_click").c_str(),
-                config::WebsiteLink.c_str(),
-                events.onLinkClicked);
-            if (fontRegular_) ImGui::PopFont();
         }
 
         ImGui::End();

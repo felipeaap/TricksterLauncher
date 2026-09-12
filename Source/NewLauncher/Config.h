@@ -12,7 +12,6 @@ namespace config
     extern std::string GameExecName;
     extern std::string Region;
     extern std::string Language;
-    extern std::string WebsiteLink;
     extern bool IsCDNUsingSSL;
 
     // Authentication endpoint (launcher_auth.php)
