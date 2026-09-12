@@ -50,6 +50,8 @@ public:
     void UnloadHeroTexture() noexcept;
     void LoadDrillTexture(struct IDirect3DDevice9* device, const std::wstring& exeDir = L"") noexcept;
     void UnloadDrillTexture() noexcept;
+    void LoadPlayButtonTexture(struct IDirect3DDevice9* device, const std::wstring& exeDir = L"") noexcept;
+    void UnloadPlayButtonTexture() noexcept;
 
 private:
     bool ModernButton(
@@ -124,5 +126,8 @@ private:
     float drillCellH_ = 86.0f;
     int drillFrameCount_ = 6;
     std::wstring selectedDrillDir_;
+    struct IDirect3DTexture9* playButtonTexture_ = nullptr;
+    unsigned int playButtonTexW_ = 0;
+    unsigned int playButtonTexH_ = 0;
     std::wstring heroExeDir_;
 };

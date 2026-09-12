@@ -1319,25 +1319,52 @@ void LauncherView::Render(
                 fontSmall_);
 
             // Primary Action: Big Game Start Button (Transitions to Login Form on click)
-            ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 30));
+            ImGui::SetCursorPos(ImVec2(winSize.x - 176, bottomCardY + 20));
             const bool gameLocked = !state.isGameEnabled;
             if (fontLarge_) ImGui::PushFont(fontLarge_);
-            if (ModernButton(
-                    "##play_btn",
-                    lang::GetString("launcher_game_start").c_str(),
-                    ImVec2(118, 58),
-                    gameLocked,
-                    ButtonIcon::Play,
-                    IM_COL32(37, 99, 235, 255),
-                    !gameLocked))
+            
+            bool playClicked = false;
+            if (playButtonTexture_ && playButtonTexW_ > 0 && playButtonTexH_ > 0)
             {
-                if (!gameLocked)
+                // Scale the epic button to a nice size, e.g. 150x70
+                ImVec2 btnSize(150.0f, 70.0f);
+                float u0 = 0.0f;
+                float v0 = 0.0f;
+                float u1 = 976.0f / static_cast<float>(playButtonTexW_);
+                float v1 = 468.0f / static_cast<float>(playButtonTexH_);
+                
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1, 1, 1, 0.2f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1, 1, 1, 0.4f));
+                if (ImGui::ImageButton("##epic_play_btn", reinterpret_cast<ImTextureID>(playButtonTexture_), btnSize, ImVec2(u0, v0), ImVec2(u1, v1), ImVec4(0, 0, 0, 0), gameLocked ? ImVec4(0.5f, 0.5f, 0.5f, 1.0f) : ImVec4(1, 1, 1, 1)))
                 {
-                    showLoginForm_ = true;
-                    if (events.onPlayClicked)
-                        events.onPlayClicked();
+                    playClicked = true;
+                }
+                ImGui::PopStyleColor(3);
+            }
+            else
+            {
+                ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 30));
+                if (ModernButton(
+                        "##play_btn",
+                        lang::GetString("launcher_game_start").c_str(),
+                        ImVec2(118, 58),
+                        gameLocked,
+                        ButtonIcon::Play,
+                        IM_COL32(37, 99, 235, 255),
+                        !gameLocked))
+                {
+                    playClicked = true;
                 }
             }
+            
+            if (playClicked && !gameLocked)
+            {
+                showLoginForm_ = true;
+                if (events.onPlayClicked)
+                    events.onPlayClicked();
+            }
+
             if (fontLarge_) ImGui::PopFont();
 
             // Secondary Action Buttons (Check, Options, Exit) - Floating White Pill Buttons
@@ -1869,5 +1896,95 @@ void LauncherView::UnloadDrillTexture() noexcept
         drillTexture_ = nullptr;
         drillTexW_ = 0;
         drillTexH_ = 0;
+    }
+}
+
+void LauncherView::LoadPlayButtonTexture(IDirect3DDevice9* device, const std::wstring& exeDir) noexcept
+{
+    if (!device) return;
+    if (playButtonTexture_) return;
+
+    std::vector<std::filesystem::path> candidatePaths;
+    if (!exeDir.empty())
+    {
+        const std::filesystem::path dir(exeDir);
+        candidatePaths.push_back(dir / L"LauncherData" / L"assets" / L"btn_game_start.png");
+        candidatePaths.push_back(dir / L"assets" / L"btn_game_start.png");
+    }
+    candidatePaths.push_back(L"LauncherData/assets/btn_game_start.png");
+    candidatePaths.push_back(L"assets/btn_game_start.png");
+
+    int width = 0, height = 0, channels = 0;
+    unsigned char* data = nullptr;
+
+    for (const auto& p : candidatePaths)
+    {
+        if (!std::filesystem::exists(p)) continue;
+        FILE* f = nullptr;
+        if (_wfopen_s(&f, p.c_str(), L"rb") == 0 && f)
+        {
+            data = stbi_load_from_file(f, &width, &height, &channels, 4);
+            fclose(f);
+            if (data) break;
+        }
+    }
+
+    if (!data) return;
+
+    const UINT texW = GetNextPowerOfTwo(static_cast<UINT>(width));
+    const UINT texH = GetNextPowerOfTwo(static_cast<UINT>(height));
+
+    LPDIRECT3DTEXTURE9 texture = nullptr;
+    HRESULT hr = device->CreateTexture(texW, texH, 1, D3DUSAGE_DYNAMIC, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &texture, nullptr);
+    if (FAILED(hr) || !texture)
+    {
+        hr = device->CreateTexture(texW, texH, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &texture, nullptr);
+    }
+    if (FAILED(hr) || !texture)
+    {
+        stbi_image_free(data);
+        return;
+    }
+
+    D3DLOCKED_RECT rect;
+    HRESULT lockHr = texture->LockRect(0, &rect, nullptr, D3DLOCK_DISCARD);
+    if (FAILED(lockHr)) lockHr = texture->LockRect(0, &rect, nullptr, 0);
+
+    if (SUCCEEDED(lockHr))
+    {
+        unsigned char* dest = static_cast<unsigned char*>(rect.pBits);
+        std::memset(dest, 0, rect.Pitch * texH);
+        for (int y = 0; y < height; ++y)
+        {
+            unsigned char* rowDest = dest + y * rect.Pitch;
+            const unsigned char* rowSrc = data + y * width * 4;
+            for (int x = 0; x < width; ++x)
+            {
+                rowDest[x * 4 + 0] = rowSrc[x * 4 + 2]; // B
+                rowDest[x * 4 + 1] = rowSrc[x * 4 + 1]; // G
+                rowDest[x * 4 + 2] = rowSrc[x * 4 + 0]; // R
+                rowDest[x * 4 + 3] = rowSrc[x * 4 + 3]; // A
+            }
+        }
+        texture->UnlockRect(0);
+        playButtonTexture_ = texture;
+        playButtonTexW_ = texW;
+        playButtonTexH_ = texH;
+    }
+    else
+    {
+        texture->Release();
+    }
+    stbi_image_free(data);
+}
+
+void LauncherView::UnloadPlayButtonTexture() noexcept
+{
+    if (playButtonTexture_)
+    {
+        playButtonTexture_->Release();
+        playButtonTexture_ = nullptr;
+        playButtonTexW_ = 0;
+        playButtonTexH_ = 0;
     }
 }
