@@ -12,7 +12,7 @@ namespace config
     std::string LauncherCDN             = "127.0.0.1:8000";
     std::vector<std::string> LauncherCDNBackups = {};
     std::string WebsiteLink             = "http://127.0.0.1:8000";
-    std::string OptionExecName          = "Setup.exe";
+    std::string OptionExecName          = "apps/Setup.exe";
     std::string GameExecName            = "Trickster/trickster.bin";
     std::string Region                  = "thailand";
     bool IsCDNUsingSSL                  = false;
@@ -26,11 +26,24 @@ namespace config
     {
         try
         {
-            const std::filesystem::path configPath =
-                std::filesystem::path(exeDir) / L"config.json";
+            std::error_code ec;
+            std::filesystem::path configPath =
+                std::filesystem::path(exeDir) / L"LauncherData" / L"config.json";
 
-            if (!std::filesystem::exists(configPath))
-                return;
+            if (!std::filesystem::exists(configPath, ec))
+            {
+                // Fallback to legacy root config.json
+                const std::filesystem::path legacyConfig =
+                    std::filesystem::path(exeDir) / L"config.json";
+                if (std::filesystem::exists(legacyConfig, ec))
+                {
+                    configPath = legacyConfig;
+                }
+                else
+                {
+                    return;
+                }
+            }
 
             std::ifstream file(configPath);
             if (!file.is_open())

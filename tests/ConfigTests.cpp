@@ -98,5 +98,24 @@ void RunConfigTests()
         RemoveTempConfig();
     }
 
+    // ── Test 6: LauncherData/config.json subfolder loading ─────────────────
+    {
+        const std::filesystem::path tmpDir =
+            std::filesystem::temp_directory_path() / "TricksterLauncherTests_Subfolder";
+        const std::filesystem::path dataDir = tmpDir / "LauncherData";
+        std::filesystem::create_directories(dataDir);
+
+        const std::filesystem::path configPath = dataDir / "config.json";
+        std::ofstream f(configPath);
+        f << R"({ "cdn": "subfolder.cdn.com", "option_exec": "apps/Setup.exe" })";
+        f.close();
+
+        config::Load(tmpDir.wstring());
+        assert(config::LauncherCDN == "subfolder.cdn.com");
+        assert(config::OptionExecName == "apps/Setup.exe");
+
+        std::filesystem::remove_all(tmpDir);
+    }
+
     std::cout << "[PASS] Config tests passed!" << std::endl;
 }

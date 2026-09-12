@@ -210,7 +210,18 @@ void LauncherPresenter::OnOption() noexcept
 {
     STARTUPINFOA si = { sizeof(si) };
     PROCESS_INFORMATION pi{};
-    const std::filesystem::path gameExe = GetGamePath() / config::OptionExecName.c_str();
+    std::filesystem::path gameExe = GetGamePath() / config::OptionExecName.c_str();
+    std::error_code ec;
+    if (!std::filesystem::exists(gameExe, ec))
+    {
+        const auto inApps = GetGamePath() / "apps" / "Setup.exe";
+        const auto inRoot = GetGamePath() / "Setup.exe";
+        if (std::filesystem::exists(inApps, ec))
+            gameExe = inApps;
+        else if (std::filesystem::exists(inRoot, ec))
+            gameExe = inRoot;
+    }
+
     const std::string exePath = gameExe.string();
     if (!CreateProcessA(exePath.c_str(), nullptr, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
     {

@@ -30,7 +30,13 @@ bool LauncherUpdater::Update(const std::filesystem::path& launcherPath,
     std::filesystem::create_directories(downloadsDir, error);
 
     const std::filesystem::path stagedPath = downloadsDir / (launcherPath.filename().string() + ".new");
-    const std::filesystem::path updaterPath = launcherPath.parent_path() / "LauncherUpdater.exe";
+    std::filesystem::path updaterPath = launcherPath.parent_path() / "apps" / "LauncherUpdater.exe";
+    if (!std::filesystem::exists(updaterPath, error))
+    {
+        const auto rootUpdater = launcherPath.parent_path() / "LauncherUpdater.exe";
+        if (std::filesystem::exists(rootUpdater, error))
+            updaterPath = rootUpdater;
+    }
     const std::filesystem::path backupPath = downloadsDir / (launcherPath.filename().string() + ".backup");
 
     std::filesystem::remove(stagedPath, error);
