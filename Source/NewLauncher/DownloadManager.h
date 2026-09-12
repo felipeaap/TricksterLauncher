@@ -33,7 +33,12 @@ public:
                   const std::string& expectedHash = {}) const;
 
 private:
+    std::string CombinePath(const std::string& path) const;
+
     std::string host_;
+    std::string cleanHost_;
+    int port_ = 80;
+    std::string basePath_;
     bool useSsl_;
     Options options_;
 };

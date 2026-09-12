@@ -539,7 +539,49 @@ bool DownloadSingleWithResume(Client& client,
     return false;
 }
 
+void ParseHostAndPath(const std::string& rawHost, bool useSsl, std::string& outHost, int& outPort, std::string& outBasePath)
+{
+    std::string s = rawHost;
+    if (s.rfind("https://", 0) == 0)
+        s = s.substr(8);
+    else if (s.rfind("http://", 0) == 0)
+        s = s.substr(7);
+
+    const auto slashPos = s.find('/');
+    std::string hostPart;
+    if (slashPos != std::string::npos)
+    {
+        hostPart = s.substr(0, slashPos);
+        outBasePath = s.substr(slashPos);
+    }
+    else
+    {
+        hostPart = s;
+        outBasePath.clear();
+    }
+
+    if (!outBasePath.empty() && outBasePath.front() != '/')
+        outBasePath = '/' + outBasePath;
+
+    while (outBasePath.size() > 1 && outBasePath.back() == '/')
+        outBasePath.pop_back();
+
+    outPort = useSsl ? 443 : 80;
+    const auto colonPos = hostPart.rfind(':');
+    if (colonPos != std::string::npos)
+    {
+        outHost = hostPart.substr(0, colonPos);
+        try { outPort = std::stoi(hostPart.substr(colonPos + 1)); }
+        catch (...) {}
+    }
+    else
+    {
+        outHost = hostPart;
+    }
+}
+
 bool DownloadMulti(const std::string& host,
+                   int port,
                    bool useSsl,
                    const std::string& remotePath,
                    const std::filesystem::path& partPath,
@@ -649,7 +691,7 @@ bool DownloadMulti(const std::string& host,
 
             if (useSsl)
             {
-                httplib::SSLClient client(host.c_str());
+                httplib::SSLClient client(host, port);
                 success = DownloadRange(client, remotePath, partPath,
                                         segment.start, segment.end,
                                         segmentProgresses[index],
@@ -659,7 +701,7 @@ bool DownloadMulti(const std::string& host,
             }
             else
             {
-                httplib::Client client(host.c_str());
+                httplib::Client client(host, port);
                 success = DownloadRange(client, remotePath, partPath,
                                         segment.start, segment.end,
                                         segmentProgresses[index],
@@ -736,6 +778,8 @@ bool DownloadMulti(const std::string& host,
 DownloadManager::DownloadManager(std::string host, bool useSsl, Options options)
     : host_(std::move(host)), useSsl_(useSsl), options_(options)
 {
+    ParseHostAndPath(host_, useSsl_, cleanHost_, port_, basePath_);
+
     if (options_.maxRetries < 0)
         options_.maxRetries = 0;
     if (options_.connectionTimeoutSeconds <= 0)
@@ -748,16 +792,39 @@ DownloadManager::DownloadManager(std::string host, bool useSsl, Options options)
         options_.segmentSizeBytes = 4LL * 1024 * 1024;
 }
 
-bool DownloadManager::Fetch(const std::string& path, std::string& outBody) const
+std::string DownloadManager::CombinePath(const std::string& path) const
 {
-    if (useSsl_)
+    if (basePath_.empty())
     {
-        httplib::SSLClient client(host_.c_str());
-        return FetchImpl(client, path, outBody, options_.connectionTimeoutSeconds);
+        if (path.empty() || path.front() != '/')
+            return "/" + path;
+        return path;
     }
 
-    httplib::Client client(host_.c_str());
-    return FetchImpl(client, path, outBody, options_.connectionTimeoutSeconds);
+    std::string result = basePath_;
+    if (result.back() == '/' && !path.empty() && path.front() == '/')
+    {
+        result.pop_back();
+    }
+    else if (result.back() != '/' && (path.empty() || path.front() != '/'))
+    {
+        result += '/';
+    }
+    result += path;
+    return result;
+}
+
+bool DownloadManager::Fetch(const std::string& path, std::string& outBody) const
+{
+    const std::string fullPath = CombinePath(path);
+    if (useSsl_)
+    {
+        httplib::SSLClient client(cleanHost_, port_);
+        return FetchImpl(client, fullPath, outBody, options_.connectionTimeoutSeconds);
+    }
+
+    httplib::Client client(cleanHost_, port_);
+    return FetchImpl(client, fullPath, outBody, options_.connectionTimeoutSeconds);
 }
 
 std::string DownloadManager::Get(const std::string& path) const
@@ -778,17 +845,18 @@ bool DownloadManager::Download(const std::string& remotePath,
     const std::filesystem::path destination(localPath);
     const auto partPath = MakePartPath(destination);
     const auto metadataPath = MakeMetadataPath(destination);
+    const std::string fullRemotePath = CombinePath(remotePath);
 
     RemoteInfo info;
     if (useSsl_)
     {
-        httplib::SSLClient client(host_.c_str());
-        info = ProbeRemote(client, remotePath, options_.connectionTimeoutSeconds);
+        httplib::SSLClient client(cleanHost_, port_);
+        info = ProbeRemote(client, fullRemotePath, options_.connectionTimeoutSeconds);
     }
     else
     {
-        httplib::Client client(host_.c_str());
-        info = ProbeRemote(client, remotePath, options_.connectionTimeoutSeconds);
+        httplib::Client client(cleanHost_, port_);
+        info = ProbeRemote(client, fullRemotePath, options_.connectionTimeoutSeconds);
     }
 
     // 1. Handle valid 0-byte (empty) files
@@ -820,7 +888,7 @@ bool DownloadManager::Download(const std::string& remotePath,
 
     if (isMulti)
     {
-        success = DownloadMulti(host_, useSsl_, remotePath, partPath, metadataPath,
+        success = DownloadMulti(cleanHost_, port_, useSsl_, fullRemotePath, partPath, metadataPath,
                                 info.size, progress, speed, errorCallback, expectedHash, options_);
     }
     else
@@ -836,14 +904,14 @@ bool DownloadManager::Download(const std::string& remotePath,
         const long long targetSize = (info.size > 0) ? info.size : 0;
         if (useSsl_)
         {
-            httplib::SSLClient client(host_.c_str());
-            success = DownloadSingleWithResume(client, remotePath, partPath,
+            httplib::SSLClient client(cleanHost_, port_);
+            success = DownloadSingleWithResume(client, fullRemotePath, partPath,
                                                targetSize, progress, speed, options_);
         }
         else
         {
-            httplib::Client client(host_.c_str());
-            success = DownloadSingleWithResume(client, remotePath, partPath,
+            httplib::Client client(cleanHost_, port_);
+            success = DownloadSingleWithResume(client, fullRemotePath, partPath,
                                                targetSize, progress, speed, options_);
         }
     }
