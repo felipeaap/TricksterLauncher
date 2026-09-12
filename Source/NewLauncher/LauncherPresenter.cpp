@@ -268,6 +268,8 @@ void LauncherPresenter::CheckSelfUpdate()
             !isMaintenance_.load(std::memory_order_acquire))
         {
             LauncherState::SetServerStatus(ServerStatus::Online);
+            std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
+            LauncherState::fileString = lang::GetString("launcher_checking");
         }
 
         if (!remoteLauncherHash.empty())
@@ -328,19 +330,27 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
             if (maintenanceFetched)
             {
                 LauncherState::SetServerStatus(ServerStatus::Online);
+                std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
+                LauncherState::fileString = lang::GetString("launcher_checking");
             }
 
             // 2. Check self-update
             CheckSelfUpdate();
 
             // 3. Coordinator check
+            {
+                std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
+                LauncherState::fileString = lang::GetString("launcher_filelist_building");
+            }
+
             UpdateCoordinator coordinator(
                 [this](const std::string& path)
                 {
                     std::string body;
                     if (FetchFromCDN(path, body))
                     {
-                        if (LauncherState::serverStatus.load(std::memory_order_relaxed) == ServerStatus::Unknown)
+                        if (LauncherState::serverStatus.load(std::memory_order_relaxed) == ServerStatus::Unknown &&
+                            !isMaintenance_.load(std::memory_order_acquire))
                         {
                             LauncherState::SetServerStatus(ServerStatus::Online);
                         }
@@ -358,11 +368,6 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
                     LauncherState::fileProgress.store(fileProgress, std::memory_order_relaxed);
                     LauncherState::totalProgress.store(totalProgress, std::memory_order_relaxed);
                 });
-
-            {
-                std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
-                LauncherState::fileString = lang::GetString("launcher_filelist_building");
-            }
 
             localVersion_ = VersionManager::Load();
 
