@@ -78,5 +78,4 @@
     <ClInclude Include="VersionManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup><ResourceCompile Include="NewLauncher.rc"><Filter>Arquivos de Recurso</Filter></ResourceCompile></ItemGroup>
-  <ItemGroup><None Include="packages.config" /></ItemGroup>
 </Project>

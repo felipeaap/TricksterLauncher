@@ -26,3 +26,8 @@ Output/
 # Test environments
 CDN_Test/
 Release_Test/
+
+# NuGet
+packages/
+*.nupkg
+
