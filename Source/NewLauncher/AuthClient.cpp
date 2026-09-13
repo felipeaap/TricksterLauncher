@@ -92,9 +92,9 @@ ParsedUrl ParseUrl(const std::string& url)
 AuthResponse Authenticate(const std::string& username, const std::string& password)
 {
     const std::string endpointUrl = config::GetResolvedAuthEndpointURL();
-    if (endpointUrl.empty() || config::AuthToken.empty())
+    if (endpointUrl.empty())
     {
-        Logger::LogError("AuthClient: AuthEndpointURL (or LauncherCDN) or AuthToken not configured.");
+        Logger::LogError("AuthClient: AuthEndpointURL (or LauncherCDN) not configured.");
         return { AuthResult::NotConfigured, "Authentication not configured." };
     }
 
