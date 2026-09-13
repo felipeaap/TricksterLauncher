@@ -139,23 +139,26 @@ bool ShouldIgnoreFile(const std::string& normalizedRelPath) noexcept
     if (normalizedRelPath.empty())
         return true;
 
-    // Filter launcher executable and manifests
+    // Filter launcher executable, generator and manifests
     if (normalizedRelPath == "splash.exe" || normalizedRelPath.ends_with("/splash.exe") ||
+        normalizedRelPath == "filelistgen.exe" || normalizedRelPath.ends_with("/filelistgen.exe") ||
         normalizedRelPath == "manifest.json" || normalizedRelPath.ends_with("/manifest.json") ||
         normalizedRelPath == "launcher.txt" || normalizedRelPath.ends_with("/launcher.txt"))
         return true;
 
-    // Filter web endpoints and tokens
+    // Filter web endpoints, tokens and documentation
     if (normalizedRelPath == "auth.php" || normalizedRelPath.ends_with("/auth.php") ||
         normalizedRelPath == "launcher_auth.php" || normalizedRelPath.ends_with("/launcher_auth.php") ||
         normalizedRelPath == "auth_token.txt" || normalizedRelPath.ends_with("/auth_token.txt") ||
         normalizedRelPath == "auth_token.enc" || normalizedRelPath.ends_with("/auth_token.enc") ||
-        normalizedRelPath == "maintenance.txt" || normalizedRelPath.ends_with("/maintenance.txt"))
+        normalizedRelPath == "maintenance.txt" || normalizedRelPath.ends_with("/maintenance.txt") ||
+        normalizedRelPath == "readme_deploy.txt" || normalizedRelPath.ends_with("/readme_deploy.txt"))
         return true;
 
-    // Filter temp / IDE / VCS / tools files
+    // Filter temp / IDE / VCS / tools / keys / zip files
     if (normalizedRelPath.starts_with("version/") || normalizedRelPath.starts_with("tools/") ||
         normalizedRelPath.starts_with(".git/") || normalizedRelPath.starts_with(".vs/") ||
+        normalizedRelPath.ends_with(".pem") || normalizedRelPath.ends_with(".zip") ||
         normalizedRelPath.ends_with(".tmp") || normalizedRelPath.ends_with(".part") ||
         normalizedRelPath.ends_with(".meta") || normalizedRelPath.ends_with(".bak") ||
         normalizedRelPath.ends_with(".log") || normalizedRelPath.ends_with(".pdb") ||
@@ -165,7 +168,7 @@ bool ShouldIgnoreFile(const std::string& normalizedRelPath) noexcept
     return false;
 }
 
-void ListFilesRecursiveUnicode(const fs::path& basePath, std::vector<std::string>& outFiles) noexcept
+void ListFilesRecursiveUnicode(const fs::path& basePath, const fs::path& relativeToPath, std::vector<std::string>& outFiles) noexcept
 {
     std::error_code ec;
     if (!fs::exists(basePath, ec) || !fs::is_directory(basePath, ec))
@@ -181,7 +184,7 @@ void ListFilesRecursiveUnicode(const fs::path& basePath, std::vector<std::string
 
         if (entry.is_regular_file(ec))
         {
-            const auto rel = fs::relative(entry.path(), basePath, ec);
+            const auto rel = fs::relative(entry.path(), relativeToPath, ec);
             if (!ec)
             {
                 std::string relStr = rel.generic_string();
@@ -199,12 +202,14 @@ enum class ExecMode { Sequential, Parallel };
 
 std::vector<Arquivo> gerarListaArquivos(
     const std::string& pastaRaiz,
+    const std::string& baseRelativa,
     ExecMode modo,
     const std::map<std::string, Arquivo>& cacheAntigo) noexcept
 {
     std::vector<std::string> caminhosRelativos;
     const fs::path rootPath(utf8ToUtf16(pastaRaiz));
-    ListFilesRecursiveUnicode(rootPath, caminhosRelativos);
+    const fs::path relBasePath = baseRelativa.empty() ? fs::current_path() : fs::path(utf8ToUtf16(baseRelativa));
+    ListFilesRecursiveUnicode(rootPath, relBasePath, caminhosRelativos);
 
     std::vector<Arquivo> arquivos(caminhosRelativos.size());
     const size_t totalFiles = caminhosRelativos.size();
@@ -227,7 +232,7 @@ std::vector<Arquivo> gerarListaArquivos(
                 break;
 
             const std::string& relPath = caminhosRelativos[i];
-            const fs::path fullPath = rootPath / utf8ToUtf16(relPath);
+            const fs::path fullPath = relBasePath / utf8ToUtf16(relPath);
             const long long fileSize = GetFileSizeW(fullPath.wstring());
             const std::string normalized = NormalizePath(relPath);
 
@@ -488,7 +493,7 @@ void PrintHelp()
               << "  -s, --sign <key_path>       Sign manifest with RSA private key (PEM format)\n"
               << "  -g, --genkey <dir>          Generate a new RSA-PSS 3072 key pair and exit\n"
               << "  -m, --mode <parallel|seq>   Execution mode (default: parallel multi-thread)\n"
-              << "  -u, --update-dir <path>     Directory to index (default: Update)\n"
+              << "  -u, --update-dir <path>     Directory to index (default: Trickster)\n"
               << "  -v, --version-dir <path>    Version history directory (default: version)\n"
               << "  -o, --output <path>         Output manifest file path (default: manifest.json)\n"
               << "  -h, --help                  Show this help message\n";
@@ -501,9 +506,10 @@ int main(int argc, char* argv[])
     ExecMode modo = ExecMode::Parallel;
     std::string privateKeyPath;
     std::string genKeyDir;
-    std::string updateDir = "Update";
+    std::string updateDir = "Trickster";
     std::string versionDir = "version";
     std::string manifestOutput = "manifest.json";
+    bool userSpecifiedUpdateDir = false;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -532,6 +538,7 @@ int main(int argc, char* argv[])
         else if ((arg == "-u" || arg == "--update-dir") && i + 1 < argc)
         {
             updateDir = argv[++i];
+            userSpecifiedUpdateDir = true;
         }
         else if ((arg == "-v" || arg == "--version-dir") && i + 1 < argc)
         {
@@ -576,8 +583,23 @@ int main(int argc, char* argv[])
         return 0;
     }
 
+    // If update directory was not explicitly given and Trickster doesn't exist, check fallback
+    std::error_code ecCheck;
+    if (!userSpecifiedUpdateDir && !fs::exists(fs::path(utf8ToUtf16(updateDir)), ecCheck))
+    {
+        if (fs::exists(L"Update", ecCheck))
+        {
+            updateDir = "Update";
+        }
+    }
+
+    const fs::path outPath(utf8ToUtf16(manifestOutput));
+    const std::string baseRelativa = outPath.has_parent_path()
+        ? utf16ToUtf8(outPath.parent_path().wstring())
+        : "";
+
     const auto antigos = carregarArquivosAntigos(versionDir);
-    const auto novos = gerarListaArquivos(updateDir, modo, antigos);
+    const auto novos = gerarListaArquivos(updateDir, baseRelativa, modo, antigos);
 
     std::vector<Arquivo> alterados;
     for (const auto& novo : novos)

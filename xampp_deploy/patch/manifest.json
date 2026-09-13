@@ -1,0 +1,13 @@
+{
+    "algorithm": "sha256",
+    "files": [
+        {
+            "FileHash": "6e559d53a2fd2e988120fc8648e1a9b2bb6694c37a4afc07b8bc50fbd70caecd",
+            "FileID": 1,
+            "FilePath": "Trickster/trickster.bin",
+            "FileSize": 25,
+            "ToUpdate": false
+        }
+    ],
+    "version": 1
+}
