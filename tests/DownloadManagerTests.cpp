@@ -22,7 +22,7 @@ void RunDownloadManagerTests()
     for (size_t i = 0; i < testData.size(); i += 1024)
         testData[i] = static_cast<char>('A' + (i / 1024) % 26);
 
-    svr.Get("/Update/testfile.bin", [&](const httplib::Request& req, httplib::Response& res)
+    svr.Get("/testfile.bin", [&](const httplib::Request& req, httplib::Response& res)
     {
         if (req.has_header("Range"))
         {

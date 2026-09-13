@@ -155,7 +155,7 @@ RemoteInfo ProbeRemote(Client& client,
     RemoteInfo info;
     ConfigureClient(client, timeoutSeconds);
 
-    const std::string url = "/Update/" + remotePath;
+    const std::string& url = remotePath;
     const auto head = client.Head(url.c_str());
     if (head)
     {
@@ -360,7 +360,7 @@ bool DownloadRange(Client& client,
     long long received = 0;
     const long long expected = end - start + 1;
 
-    const auto response = client.Get(("/Update/" + remotePath).c_str(), headers,
+    const auto response = client.Get(remotePath.c_str(), headers,
         [&](const char* data, size_t length)
         {
             if (received + static_cast<long long>(length) > expected)
@@ -446,7 +446,7 @@ bool DownloadSingleWithResume(Client& client,
             return false;
 
         long long received = 0;
-        const auto response = client.Get(("/Update/" + remotePath).c_str(), headers,
+        const auto response = client.Get(remotePath.c_str(), headers,
             [&](const char* data, size_t length)
             {
                 output.write(data, static_cast<std::streamsize>(length));
