@@ -1045,15 +1045,37 @@ void LauncherView::Render(
         dl->AddRectFilled(ImVec2(0, 0), ImVec2(winSize.x, 34), IM_COL32(255, 255, 255, 230), 16.0f, ImDrawFlags_RoundCornersTop);
         dl->AddLine(ImVec2(0, 34), ImVec2(winSize.x, 34), IM_COL32(203, 213, 225, 220), 1.0f);
 
-        // Logo Icon & Title
-        const char* titleText = "Trickster Online";
-        ImVec2 titleDim(0, 0);
-        if (fontBold_) ImGui::PushFont(fontBold_);
-        titleDim = ImGui::CalcTextSize(titleText);
-        dl->AddText(ImVec2(16, 8), IM_COL32(15, 23, 42, 255), titleText);
-        if (fontBold_) ImGui::PopFont();
+        // Logo Icon & Title + Subtitle
+        std::string titleStr = "Trickster Online";
+        if (!config::WindowTitle.empty())
+        {
+            const int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, config::WindowTitle.c_str(), static_cast<int>(config::WindowTitle.size()), nullptr, 0, nullptr, nullptr);
+            if (sizeNeeded > 0)
+            {
+                titleStr.resize(sizeNeeded);
+                WideCharToMultiByte(CP_UTF8, 0, config::WindowTitle.c_str(), static_cast<int>(config::WindowTitle.size()), &titleStr[0], sizeNeeded, nullptr, nullptr);
+            }
+        }
 
-        // Server Status Tag Pill
+        float currentX = 16.0f;
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        const ImVec2 titleDim = ImGui::CalcTextSize(titleStr.c_str());
+        dl->AddText(ImVec2(currentX, 8), IM_COL32(15, 23, 42, 255), titleStr.c_str());
+        if (fontBold_) ImGui::PopFont();
+        currentX += titleDim.x;
+
+        // Subtitle right beside the Title
+        if (!config::SubTitle.empty())
+        {
+            currentX += 8.0f;
+            dl->AddText(ImVec2(currentX, 8), IM_COL32(203, 213, 225, 255), "|");
+            currentX += 10.0f;
+            if (fontRegular_) ImGui::PushFont(fontRegular_);
+            dl->AddText(ImVec2(currentX, 8), IM_COL32(100, 116, 139, 240), config::SubTitle.c_str());
+            if (fontRegular_) ImGui::PopFont();
+        }
+
+        // Server Status Tag Pill (Anchored to the left of window controls)
         const char* statusText = "Unknown";
         ImU32 bgCol = IM_COL32(241, 245, 249, 240);
         ImU32 borderCol = IM_COL32(203, 213, 225, 220);
@@ -1077,13 +1099,15 @@ void LauncherView::Render(
             baseDotCol = IM_COL32(239, 68, 68, 255); // Red for Maintenance
         }
 
-        const float pillX = 16.0f + titleDim.x + 12.0f;
         if (fontSmall_) ImGui::PushFont(fontSmall_);
         const ImVec2 textDim = ImGui::CalcTextSize(statusText);
         const float pillWidth = textDim.x + 28.0f;
         const float pillY0 = 6.0f;
         const float pillY1 = 28.0f;
         const float pillMidY = (pillY0 + pillY1) * 0.5f;
+
+        // Position anchored to the left of the minimize button (winSize.x - 64)
+        const float pillX = (winSize.x - 64.0f) - 10.0f - pillWidth;
 
         // Pill background & border
         dl->AddRectFilled(
