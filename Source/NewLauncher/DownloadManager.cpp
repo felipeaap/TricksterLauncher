@@ -20,20 +20,59 @@
 
 namespace
 {
+std::filesystem::path MakeDownloadsStagingPath(const std::filesystem::path& destination)
+{
+    const std::filesystem::path downloadsBase = "downloads";
+
+    std::filesystem::path rel = destination.lexically_normal();
+    if (destination.is_absolute())
+    {
+        std::error_code ec;
+        auto relative = std::filesystem::relative(destination, std::filesystem::current_path(), ec);
+        if (!ec && !relative.empty() && relative.native().find(L"..") == std::wstring::npos)
+        {
+            rel = relative.lexically_normal();
+        }
+        else
+        {
+            rel = destination.filename();
+        }
+    }
+
+    std::filesystem::path cleanRel;
+    for (const auto& part : rel)
+    {
+        if (part == "." || part == "..")
+            continue;
+        cleanRel /= part;
+    }
+
+    if (cleanRel.empty())
+        cleanRel = destination.filename();
+
+    return downloadsBase / cleanRel;
+}
+
 void CleanTemporaryDownloadFiles(const std::filesystem::path& destination)
 {
     std::error_code ec;
-    const std::filesystem::path partPath   = destination.string() + ".part";
-    const std::filesystem::path metaPath   = destination.string() + ".part.meta";
+    const std::filesystem::path staged = MakeDownloadsStagingPath(destination);
+    const std::filesystem::path partPath   = staged.string() + ".part";
+    const std::filesystem::path metaPath   = staged.string() + ".part.meta";
     const std::filesystem::path tmpPath    = metaPath.string() + ".tmp";
-    const std::filesystem::path bakPath    = destination.string() + ".bak";
-    const std::filesystem::path backupPath = destination.string() + ".backup";
+    const std::filesystem::path bakPath    = staged.string() + ".bak";
+    const std::filesystem::path backupPath = staged.string() + ".backup";
 
     std::filesystem::remove(partPath, ec);   ec.clear();
     std::filesystem::remove(metaPath, ec);   ec.clear();
     std::filesystem::remove(tmpPath, ec);    ec.clear();
     std::filesystem::remove(bakPath, ec);    ec.clear();
     std::filesystem::remove(backupPath, ec); ec.clear();
+
+    std::filesystem::remove(destination.string() + ".part", ec); ec.clear();
+    std::filesystem::remove(destination.string() + ".part.meta", ec); ec.clear();
+    std::filesystem::remove(destination.string() + ".bak", ec); ec.clear();
+    std::filesystem::remove(destination.string() + ".backup", ec); ec.clear();
 }
 
 struct RemoteInfo
@@ -227,16 +266,16 @@ RemoteInfo ProbeRemote(Client& client,
 
 std::filesystem::path MakePartPath(const std::filesystem::path& destination)
 {
-    auto path = destination;
-    path += ".part";
-    return path;
+    auto staged = MakeDownloadsStagingPath(destination);
+    staged += ".part";
+    return staged;
 }
 
 std::filesystem::path MakeMetadataPath(const std::filesystem::path& destination)
 {
-    auto path = destination;
-    path += ".part.meta";
-    return path;
+    auto staged = MakeDownloadsStagingPath(destination);
+    staged += ".part.meta";
+    return staged;
 }
 
 bool PreparePartFile(const std::filesystem::path& path, long long size)
@@ -307,6 +346,13 @@ bool SaveMetadata(const std::filesystem::path& metadataPath,
                   const std::string& expectedHash,
                   const std::vector<SegmentState>& segments)
 {
+    std::error_code error;
+    if (metadataPath.has_parent_path())
+    {
+        std::filesystem::create_directories(metadataPath.parent_path(), error);
+        error.clear();
+    }
+
     const auto temporaryPath = metadataPath.string() + ".tmp";
     std::ofstream output(temporaryPath, std::ios::trunc);
     if (!output)
@@ -322,7 +368,7 @@ bool SaveMetadata(const std::filesystem::path& metadataPath,
     if (!output)
         return false;
 
-    std::error_code error;
+    error.clear();
     std::filesystem::remove(metadataPath, error);
     error.clear();
     std::filesystem::rename(temporaryPath, metadataPath, error);
@@ -419,6 +465,12 @@ bool DownloadSingleWithResume(Client& client,
                               const DownloadManager::Options& options)
 {
     std::error_code error;
+    if (partPath.has_parent_path())
+    {
+        std::filesystem::create_directories(partPath.parent_path(), error);
+        error.clear();
+    }
+
     long long offset = 0;
     if (std::filesystem::exists(partPath, error))
         offset = static_cast<long long>(std::filesystem::file_size(partPath, error));
@@ -951,6 +1003,12 @@ bool DownloadManager::Download(const std::string& remotePath,
         return false;
     }
 
+    if (destination.has_parent_path())
+    {
+        std::filesystem::create_directories(destination.parent_path(), error);
+        error.clear();
+    }
+
     if (std::filesystem::exists(destination, error))
     {
         SetFileAttributesW(destination.c_str(), FILE_ATTRIBUTE_NORMAL);
@@ -978,6 +1036,7 @@ bool DownloadManager::Download(const std::string& remotePath,
                 errorCallback("Failed to move completed part file to final destination: " + destination.string());
             return false;
         }
+        std::filesystem::remove(partPath, error);
     }
 
     CleanTemporaryDownloadFiles(destination);

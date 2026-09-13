@@ -155,8 +155,9 @@ bool ShouldIgnoreFile(const std::string& normalizedRelPath) noexcept
         normalizedRelPath == "readme_deploy.txt" || normalizedRelPath.ends_with("/readme_deploy.txt"))
         return true;
 
-    // Filter temp / IDE / VCS / tools / keys / zip files
+    // Filter temp / IDE / VCS / tools / keys / zip / downloads / data files
     if (normalizedRelPath.starts_with("version/") || normalizedRelPath.starts_with("tools/") ||
+        normalizedRelPath.starts_with("downloads/") || normalizedRelPath.starts_with("launcherdata/") ||
         normalizedRelPath.starts_with(".git/") || normalizedRelPath.starts_with(".vs/") ||
         normalizedRelPath.ends_with(".pem") || normalizedRelPath.ends_with(".zip") ||
         normalizedRelPath.ends_with(".tmp") || normalizedRelPath.ends_with(".part") ||
