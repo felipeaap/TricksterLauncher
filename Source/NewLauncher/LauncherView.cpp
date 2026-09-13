@@ -896,7 +896,7 @@ void LauncherView::RenderLoginForm(
     const LauncherViewEvents& events) noexcept
 {
     // 1. Header / Status line
-    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 8));
+    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 6));
     if (fontBold_) ImGui::PushFont(fontBold_);
     if (!authErrorText_.empty())
     {
@@ -910,7 +910,7 @@ void LauncherView::RenderLoginForm(
 
     // 2. Custom Input Styles for Modern Pastel Theme
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 5.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 4.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.2f);
     ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(248, 250, 252, 255));
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(241, 245, 249, 255));
@@ -922,7 +922,7 @@ void LauncherView::RenderLoginForm(
     if (fontRegular_) ImGui::PushFont(fontRegular_);
 
     // Account ID Input
-    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 28));
+    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 22));
     ImGui::SetNextItemWidth(210.0f);
     bool enterAccount = ImGui::InputTextWithHint(
         "##account_input",
@@ -932,7 +932,7 @@ void LauncherView::RenderLoginForm(
         ImGuiInputTextFlags_EnterReturnsTrue);
 
     // Password Input
-    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 58));
+    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 47));
     ImGui::SetNextItemWidth(210.0f);
     bool enterPass = ImGui::InputTextWithHint(
         "##password_input",
@@ -944,7 +944,7 @@ void LauncherView::RenderLoginForm(
     if (fontRegular_) ImGui::PopFont();
 
     // Remember ID Checkbox
-    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 88));
+    ImGui::SetCursorPos(ImVec2(28, bottomCardY + 72));
     if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::PushStyleColor(ImGuiCol_CheckMark, IM_COL32(37, 99, 235, 255));
     ImGui::Checkbox(lang::GetString("launcher_login_remember").c_str(), &rememberAccount_);
@@ -955,7 +955,7 @@ void LauncherView::RenderLoginForm(
     ImGui::PopStyleVar(3);
 
     // 3. BACK Button
-    ImGui::SetCursorPos(ImVec2(248, bottomCardY + 44));
+    ImGui::SetCursorPos(ImVec2(248, bottomCardY + 34));
     if (fontBold_) ImGui::PushFont(fontBold_);
     if (ModernButton(
             "##btn_back",
@@ -970,7 +970,7 @@ void LauncherView::RenderLoginForm(
     if (fontBold_) ImGui::PopFont();
 
     // 4. Primary CONNECT Button
-    ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 32));
+    ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 22));
     if (fontLarge_) ImGui::PushFont(fontLarge_);
     bool connectClicked = ModernButton(
         "##connect_btn",
@@ -1277,7 +1277,7 @@ void LauncherView::Render(
         else
         {
             // Status text & download speed chip
-            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 8));
+            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 6));
             if (fontBold_) ImGui::PushFont(fontBold_);
             ImGui::TextColored(ImVec4(0.06f, 0.09f, 0.16f, 1.0f), "%s", state.fileString.c_str());
             if (fontBold_) ImGui::PopFont();
@@ -1287,7 +1287,7 @@ void LauncherView::Render(
                 ImVec2 textSize = ImGui::CalcTextSize(state.speedString.c_str());
                 const float chipW = textSize.x + 16.0f;
                 const float chipX = winSize.x - chipW - 28.0f;
-                const float chipY = bottomCardY + 6.0f;
+                const float chipY = bottomCardY + 4.0f;
 
                 // Speed Chip Pill (Light Sky Blue Pill)
                 dl->AddRectFilled(
@@ -1311,7 +1311,7 @@ void LauncherView::Render(
 
             // Dual Progress Bars
             // Progress bar 1: File progress (Golden-Yellow Mini Gauge)
-            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 24));
+            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 22));
             RenderTricksterProgressBar(
                 animFileProgress_,
                 ImVec2(348, 8),
@@ -1321,7 +1321,7 @@ void LauncherView::Render(
                 nullptr);
 
             // Progress bar 2: Total progress (Iconic Trickster Gauge with Gears, Ruler Scale & Drilling Mascot)
-            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 36));
+            ImGui::SetCursorPos(ImVec2(28, bottomCardY + 34));
             RenderTricksterProgressBar(
                 animTotalProgress_,
                 ImVec2(348, 18),
@@ -1331,13 +1331,13 @@ void LauncherView::Render(
                 fontSmall_);
 
             // Primary Action: Big Game Start Button (Transitions to Login Form on click)
-            ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 30));
+            ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 24));
             const bool gameLocked = !state.isGameEnabled;
             if (fontLarge_) ImGui::PushFont(fontLarge_);
             if (ModernButton(
                     "##play_btn",
                     lang::GetString("launcher_game_start").c_str(),
-                    ImVec2(118, 58),
+                    ImVec2(118, 62),
                     gameLocked,
                     ButtonIcon::Play,
                     IM_COL32(37, 99, 235, 255),
@@ -1353,7 +1353,7 @@ void LauncherView::Render(
             if (fontLarge_) ImGui::PopFont();
 
             // Secondary Action Buttons (Check, Options, Exit) - Floating White Pill Buttons
-            const float btnY = bottomCardY + 62.0f;
+            const float btnY = bottomCardY + 58.0f;
             const float btnW = 108.0f;
             const float btnH = 28.0f;
 

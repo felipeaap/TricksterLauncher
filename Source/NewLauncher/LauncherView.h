@@ -33,7 +33,7 @@ public:
     ~LauncherView() = default;
 
     static constexpr int kWidth = 538;
-    static constexpr int kHeight = 526;
+    static constexpr int kHeight = 480;
 
     void Initialize() noexcept;
     void Render(
