@@ -1,176 +1,157 @@
 <?php
-/**
- * auth.php / launcher_auth.php
- *
- * Trickster Online Launcher Authentication API Endpoint
- *
- * Handles client login requests, verifies credentials against MySQL/MSSQL,
- * checks account status (active/banned), and returns structured JSON responses.
- */
-
 declare(strict_types=1);
 
+/*
+ * Ponte de compatibilidade para o launcher legado.
+ *
+ * Contrato recebido:
+ *   POST form: auth_token, username, password
+ *
+ * Contrato devolvido:
+ *   {"status":"success","message":"Login success"}
+ *   ou {"status":"error","message":"..."}
+ *
+ * Este arquivo NÃO acessa SQL Server. A única conexão é com a API unificada
+ * na VPS nova. O token é validado localmente e nunca é encaminhado à API.
+ */
+
+const DEFAULT_API_URL = 'http://15.235.173.71:8000/api/login';
+
 header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
 
-// =============================================================================
-// CONFIGURATION
-// =============================================================================
-
-// Secret token shared between launcher and server. Leave empty ("") to disable verification during development.
-define('AUTH_TOKEN', '');
-
-// Database Connection
-define('DB_DRIVER',   'mysql');          // 'mysql' or 'sqlsrv'
-define('DB_HOST',     '127.0.0.1');
-define('DB_PORT',     3306);
-define('DB_NAME',     'trickster_account');
-define('DB_USER',     'root');
-define('DB_PASS',     '');
-
-// Table & Column Schema Mapping
-define('TBL_ACCOUNTS',      'tbl_account'); // Table storing account records
-define('COL_USERNAME',      'account_id');  // Column for user login name
-define('COL_PASSWORD',      'password');    // Column for user password
-define('COL_IS_BLOCKED',    'block');       // Column for ban flag (0 = active, 1 = banned) - set to null if none
-define('COL_BLOCK_REASON',  'block_reason');// Column for ban reason - set to null if none
-define('COL_RELEASE_DATE',  'block_date');  // Column for ban expiration - set to null if none
-
-// Password Hashing Algorithm:
-// 'md5'    - Standard classic Trickster (md5($password))
-// 'sha256' - Standard SHA-256 (hash('sha256', $password))
-// 'bcrypt' - Modern PHP password_hash / password_verify
-// 'plain'  - Plaintext comparison (not recommended for production)
-define('PASSWORD_HASH_TYPE', 'md5');
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-function respond(string $status, string $message, array $extra = []): void
+function reply(array $payload)
 {
-    $payload = array_merge(['status' => $status, 'message' => $message], $extra);
+    // O endpoint PHP original devolvia erros de autenticação com HTTP 200;
+    // manter isso evita quebrar launchers antigos que leem apenas o JSON.
+    http_response_code(200);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-function verify_password(string $inputPassword, string $storedHash): bool
+function configured_token(): string
 {
-    switch (strtolower(PASSWORD_HASH_TYPE)) {
-        case 'md5':
-            return strtolower(md5($inputPassword)) === strtolower($storedHash);
-        case 'sha256':
-            return strtolower(hash('sha256', $inputPassword)) === strtolower($storedHash);
-        case 'bcrypt':
-            return password_verify($inputPassword, $storedHash);
-        case 'plain':
-            return $inputPassword === $storedHash;
-        default:
-            return false;
-    }
-}
-
-// =============================================================================
-// REQUEST PROCESSING
-// =============================================================================
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    respond('error', 'Method not allowed. Use POST.');
-}
-
-// Support both form-urlencoded and JSON body
-$username = $_POST['username'] ?? '';
-$password = $_POST['password'] ?? '';
-$token    = $_POST['auth_token'] ?? '';
-
-if (empty($username) || empty($password)) {
-    $rawInput = file_get_contents('php://input');
-    if (!empty($rawInput)) {
-        $json = json_decode($rawInput, true);
-        if (is_array($json)) {
-            $username = $json['username'] ?? $username;
-            $password = $json['password'] ?? $password;
-            $token    = $json['auth_token'] ?? $token;
-        }
-    }
-}
-
-$username = trim((string)$username);
-$password = (string)$password;
-$token    = trim((string)$token);
-
-if (empty($username) || empty($password)) {
-    respond('error', 'Username and password are required.');
-}
-
-// Validate Auth Token (if configured)
-if (AUTH_TOKEN !== '' && !hash_equals(AUTH_TOKEN, $token)) {
-    respond('error', 'Unauthorized: invalid auth_token.');
-}
-
-// =============================================================================
-// DATABASE QUERY & AUTHENTICATION
-// =============================================================================
-
-try {
-    if (DB_DRIVER === 'sqlsrv') {
-        $dsn = sprintf('sqlsrv:Server=%s,%d;Database=%s', DB_HOST, DB_PORT, DB_NAME);
-    } else {
-        $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', DB_HOST, DB_PORT, DB_NAME);
+    $environmentToken = getenv('LAUNCHER_AUTH_TOKEN');
+    if (is_string($environmentToken) && $environmentToken !== '') {
+        return trim($environmentToken);
     }
 
-    $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_TIMEOUT            => 5,
+    // Fora do document root. Exemplo: C:\\xampp\\private\\launcher-auth.secret
+    $secretFile = getenv('LAUNCHER_AUTH_SECRET_FILE');
+    if (!is_string($secretFile) || $secretFile === '') {
+        $secretFile = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'private'
+            . DIRECTORY_SEPARATOR . 'launcher-auth.secret';
+    }
+
+    if (!is_file($secretFile) || !is_readable($secretFile)) {
+        return '';
+    }
+
+    $contents = file_get_contents($secretFile);
+    return is_string($contents) ? trim($contents) : '';
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    reply(['status' => 'error', 'message' => 'Invalid request method.']);
+}
+
+$receivedToken = $_POST['auth_token'] ?? '';
+$expectedToken = configured_token();
+if (!is_string($receivedToken) || $expectedToken === ''
+    || !hash_equals($expectedToken, $receivedToken)) {
+    reply(['status' => 'error', 'message' => 'No authority!']);
+}
+
+$username = $_POST['username'] ?? null;
+$password = $_POST['password'] ?? null;
+if (!is_string($username) || !is_string($password)) {
+    reply(['status' => 'error', 'message' => 'Login failed']);
+}
+
+$username = trim($username);
+if ($username === '' || strlen($username) > 18 || strlen($password) > 128) {
+    reply(['status' => 'error', 'message' => 'Login failed']);
+}
+
+if (!function_exists('curl_init')) {
+    error_log('launcher_auth.php: PHP cURL extension is not enabled');
+    reply(['status' => 'error', 'message' => 'Login service unavailable.']);
+}
+
+$apiUrl = getenv('TRICKSTER_API_LOGIN_URL');
+if (!is_string($apiUrl) || $apiUrl === '') {
+    $apiUrl = DEFAULT_API_URL;
+}
+
+$requestBody = json_encode(
+    ['username' => $username, 'password' => $password],
+    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+);
+if ($requestBody === false) {
+    reply(['status' => 'error', 'message' => 'Login failed']);
+}
+
+$clientIp = $_SERVER['REMOTE_ADDR'] ?? '';
+$requestId = bin2hex(random_bytes(16));
+$curl = curl_init($apiUrl);
+curl_setopt_array($curl, [
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => $requestBody,
+    CURLOPT_HTTPHEADER => [
+        'Accept: application/json',
+        'Content-Type: application/json',
+        'X-Request-ID: ' . $requestId,
+        // O API usa este valor somente para rate limiting. Ele é preenchido
+        // pelo servidor, nunca por um header recebido do cliente.
+        'X-Real-IP: ' . $clientIp,
+    ],
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_CONNECTTIMEOUT => 3,
+    CURLOPT_TIMEOUT => 15,
+    CURLOPT_FOLLOWLOCATION => false,
+]);
+
+$rawResponse = curl_exec($curl);
+$curlError = curl_error($curl);
+$httpCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+curl_close($curl);
+
+if ($rawResponse === false) {
+    error_log('launcher_auth.php: API request failed: ' . $curlError);
+    reply(['status' => 'error', 'message' => 'Login service unavailable.']);
+}
+
+$apiResponse = json_decode($rawResponse, true);
+if (!is_array($apiResponse)) {
+    error_log('launcher_auth.php: API returned invalid JSON');
+    reply(['status' => 'error', 'message' => 'Login service unavailable.']);
+}
+
+if ($httpCode === 200 && ($apiResponse['success'] ?? false) === true) {
+    reply(['status' => 'success', 'message' => 'Login success']);
+}
+
+$detail = $apiResponse['detail'] ?? null;
+if ($httpCode === 403 && is_array($detail)) {
+    reply([
+        'status' => 'error',
+        'message' => 'Account is banned.',
+        'release_date' => $detail['release_date'] ?? null,
+        'reason' => $detail['reason'] ?? null,
     ]);
-} catch (PDOException $e) {
-    respond('error', 'Database connection failed. Please try again later.');
 }
 
-try {
-    $selectCols = [COL_USERNAME, COL_PASSWORD];
-    if (COL_IS_BLOCKED !== null)   $selectCols[] = COL_IS_BLOCKED;
-    if (COL_BLOCK_REASON !== null) $selectCols[] = COL_BLOCK_REASON;
-    if (COL_RELEASE_DATE !== null) $selectCols[] = COL_RELEASE_DATE;
-
-    $query = sprintf(
-        'SELECT %s FROM %s WHERE %s = :username LIMIT 1',
-        implode(', ', $selectCols),
-        TBL_ACCOUNTS,
-        COL_USERNAME
-    );
-
-    $stmt = $pdo->prepare($query);
-    $stmt->execute([':username' => $username]);
-    $account = $stmt->fetch();
-
-    if (!$account) {
-        respond('error', 'Invalid username or password.');
-    }
-
-    // Check Ban Status
-    if (COL_IS_BLOCKED !== null && !empty($account[COL_IS_BLOCKED])) {
-        $isBlocked = (int)$account[COL_IS_BLOCKED];
-        if ($isBlocked !== 0) {
-            $reason = (COL_BLOCK_REASON !== null && isset($account[COL_BLOCK_REASON])) ? (string)$account[COL_BLOCK_REASON] : 'Violation of Terms of Service';
-            $releaseDate = (COL_RELEASE_DATE !== null && isset($account[COL_RELEASE_DATE])) ? (string)$account[COL_RELEASE_DATE] : 'Permanent';
-            respond('error', 'Account is banned.', [
-                'reason'       => $reason,
-                'release_date' => $releaseDate
-            ]);
-        }
-    }
-
-    // Verify Password
-    $storedPassword = (string)$account[COL_PASSWORD];
-    if (!verify_password($password, $storedPassword)) {
-        respond('error', 'Invalid username or password.');
-    }
-
-    // Authentication Successful!
-    respond('success', 'Authentication successful.');
-
-} catch (PDOException $e) {
-    respond('error', 'Authentication query error.');
+if ($httpCode === 409) {
+    reply(['status' => 'error', 'message' => 'Player is already online.']);
 }
+
+if ($httpCode === 429) {
+    reply(['status' => 'error', 'message' => 'Too many login attempts.']);
+}
+
+if ($httpCode >= 500) {
+    reply(['status' => 'error', 'message' => 'Login service unavailable.']);
+}
+
+// 401 e demais respostas de validação continuam genéricas para não revelar
+// se o usuário existe no banco.
+reply(['status' => 'error', 'message' => 'Incorrect username/password.']);
