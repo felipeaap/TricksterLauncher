@@ -5,8 +5,8 @@
 1. ESTRUTURA AUTOMATIZADA:
    - O launcher resolve automaticamente o endpoint de autenticação a partir
      da URL do CDN: {scheme}://{cdn}/auth.php
-   - O token de segurança é recuperado automaticamente do CDN (auth_token.txt / auth_token.enc).
-   - Nenhuma URL de autenticação ou token precisa ser configurada manualmente no cliente.
+   - A autenticação repassa as credenciais via proxy direto para a API VPS.
+   - Nenhuma URL de autenticação adicional precisa ser configurada manualmente no cliente.
 
 2. COMO INSTALAR:
    - Extraia a pasta "patch" deste pacote diretamente dentro de:
@@ -18,25 +18,21 @@
        ├── Splash.exe              (Binário do Launcher para autoupdate)
        ├── launcher.txt            (Hash SHA-256 do Splash.exe)
        ├── manifest.json           (Lista de arquivos e versões do patch)
-       ├── auth.php                (Endpoint de autenticação de login)
-       ├── auth_token.txt          (Token de autenticação do CDN)
-       └── Trickster/
-           └── trickster.bin       (Arquivos do cliente do jogo)
+       └── auth.php                (Endpoint de autenticação de login)
 
 3. INICIAR O APACHE NO XAMPP:
    - Abra o "XAMPP Control Panel".
    - Clique em "Start" no módulo "Apache".
    - Para testar no navegador:
-     http://127.0.0.1/patch/auth_token.txt
      http://127.0.0.1/patch/manifest.json
 
 4. GERAR NOVAS ATUALIZAÇÕES:
-   - Sempre que adicionar ou modificar arquivos do jogo na pasta "Trickster/",
+   - Quando adicionar ou modificar arquivos de atualização para o client (ex: dentro de subpastas como "Trickster/"),
      ou atualizar o Splash.exe, abra o terminal dentro de "C:\xampp\htdocs\patch"
-     e execute simplesmente:
+     e execute:
      .\FileListGen.exe
      
-   - O FileListGen irá escanear a pasta "Trickster/", gerar o "manifest.json"
+   - O FileListGen irá escanear os arquivos, gerar o "manifest.json"
      com os caminhos relativos e atualizar o "launcher.txt".
 
 5. CONFIGURAÇÃO NO LAUNCHER DO CLIENTE (LauncherData/config.json):
