@@ -80,26 +80,38 @@ ManifestManager::ManifestManager(FetchFunction fetch)
 
 int ManifestManager::Load(FileList& files, bool isFullCheck, int& localVersion)
 {
+    const std::string consolidated = fetch_ ? fetch_("/manifest.json") : std::string();
+    return Parse(consolidated, files, isFullCheck, localVersion);
+}
+
+int ManifestManager::Parse(const std::string& consolidated, FileList& files, bool isFullCheck, int& localVersion)
+{
     localVersion = isFullCheck ? 1 : localVersion;
     files.clear();
 
+    if (consolidated.empty())
+        return localVersion;
+
     try
     {
-        const std::string consolidated = fetch_("/manifest.json");
-        if (!consolidated.empty())
+        const nlohmann::json document = nlohmann::json::parse(consolidated);
+        if (ValidateConsolidatedManifest(document))
         {
-            const nlohmann::json document = nlohmann::json::parse(consolidated);
-            if (ValidateConsolidatedManifest(document))
+            const int manifestVersion = document.value("version", localVersion);
+
+            // Lazy fast-path: When up-to-date and not full-checking, skip heavy array allocation & file parsing
+            if (!isFullCheck && localVersion > 0 && manifestVersion > 0 && localVersion >= manifestVersion)
             {
-                const int manifestVersion = document.value("version", localVersion);
-                LoadFilesFromArray(document.value("files", nlohmann::json::array()), files);
                 return manifestVersion;
             }
-            else
-            {
-                files.clear();
-                return localVersion;
-            }
+
+            LoadFilesFromArray(document.value("files", nlohmann::json::array()), files);
+            return manifestVersion;
+        }
+        else
+        {
+            files.clear();
+            return localVersion;
         }
     }
     catch (const nlohmann::json::exception&)
@@ -107,9 +119,6 @@ int ManifestManager::Load(FileList& files, bool isFullCheck, int& localVersion)
         files.clear();
         return localVersion;
     }
-
-    files.clear();
-    return localVersion;
 }
 
 bool ManifestManager::IsSamePath(const std::string& left, const std::string& right)

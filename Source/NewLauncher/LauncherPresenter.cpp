@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <future>
 #define NOMINMAX
 #include <windows.h>
 #include <shellapi.h>
@@ -323,11 +324,27 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
             }
             LauncherState::SetServerStatus(ServerStatus::Unknown);
 
-            // 1. Check maintenance status from CDN
-            std::string maintenanceResponse;
-            const bool maintenanceFetched = FetchFromCDN("/maintenance.txt", maintenanceResponse);
+            // Parallel Prefetch: Query maintenance status, launcher hash, and manifest concurrently
+            auto futureMaint = std::async(std::launch::async, [this]() {
+                std::string body;
+                const bool fetched = FetchFromCDN("/maintenance.txt", body);
+                return std::make_pair(fetched, std::move(body));
+            });
 
-            // Trim whitespace
+            auto futureLauncher = std::async(std::launch::async, [this]() {
+                std::string body;
+                const bool fetched = FetchFromCDN("/launcher.txt", body);
+                return std::make_pair(fetched, std::move(body));
+            });
+
+            auto futureManifest = std::async(std::launch::async, [this]() {
+                std::string body;
+                const bool fetched = FetchFromCDN("/manifest.json", body);
+                return std::make_pair(fetched, std::move(body));
+            });
+
+            // 1. Process maintenance
+            auto [maintenanceFetched, maintenanceResponse] = futureMaint.get();
             maintenanceResponse.erase(maintenanceResponse.find_last_not_of(" \n\r\t") + 1);
             maintenanceResponse.erase(0, maintenanceResponse.find_first_not_of(" \n\r\t"));
 
@@ -345,25 +362,53 @@ void LauncherPresenter::CheckUpdatesAsync(bool isFullCheck)
                 return;
             }
 
-            if (maintenanceFetched)
+            // 2. Process self-update check
+            auto [launcherFetched, remoteLauncherHash] = futureLauncher.get();
+            if (maintenanceFetched || launcherFetched)
             {
                 LauncherState::SetServerStatus(ServerStatus::Online);
                 std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
                 LauncherState::fileString = lang::GetString("launcher_checking");
             }
 
-            // 2. Check self-update
-            CheckSelfUpdate();
+            if (launcherFetched && !remoteLauncherHash.empty())
+            {
+                remoteLauncherHash.erase(remoteLauncherHash.find_last_not_of(" \n\r\t") + 1);
+                remoteLauncherHash.erase(0, remoteLauncherHash.find_first_not_of(" \n\r\t"));
 
-            // 3. Coordinator check
+                const std::string launcherName = "Splash.exe";
+                char exePath[MAX_PATH]{};
+                GetModuleFileNameA(nullptr, exePath, MAX_PATH);
+                const std::string currentExe = exePath;
+                const std::filesystem::path launcherPath(currentExe);
+
+                LauncherUpdater updater(GetEndpoints(), config::IsCDNUsingSSL);
+                updater.Update(
+                    launcherPath,
+                    remoteLauncherHash,
+                    launcherName,
+                    currentExe);
+            }
+
+            // 3. Process manifest & coordinator check
+            auto [manifestFetched, manifestBody] = futureManifest.get();
+            if (manifestFetched)
+            {
+                LauncherState::SetServerStatus(ServerStatus::Online);
+            }
+
             {
                 std::lock_guard<std::mutex> lock(LauncherState::fileStringMutex);
                 LauncherState::fileString = lang::GetString("launcher_filelist_building");
             }
 
             UpdateCoordinator coordinator(
-                [this](const std::string& path)
+                [this, cachedManifest = manifestBody](const std::string& path)
                 {
+                    if (path == "/manifest.json" && !cachedManifest.empty())
+                    {
+                        return cachedManifest;
+                    }
                     std::string body;
                     if (FetchFromCDN(path, body))
                     {

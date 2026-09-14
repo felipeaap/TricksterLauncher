@@ -21,7 +21,42 @@ bool LauncherUpdater::Update(const std::filesystem::path& launcherPath,
     if (remoteHash.empty() || currentExecutable.empty())
         return false;
 
-    const std::string localHash = integrity::createHashFromFile(launcherPath.string(), remoteHash);
+    // Fast-path: Check if local executable matches cached timestamp & size
+    static std::string s_cachedPath;
+    static std::string s_cachedHash;
+    static unsigned long long s_cachedMtime = 0;
+    static long long s_cachedSize = 0;
+
+    std::string localHash;
+    WIN32_FILE_ATTRIBUTE_DATA attrData{};
+    if (GetFileAttributesExW(launcherPath.c_str(), GetFileExInfoStandard, &attrData))
+    {
+        ULARGE_INTEGER ft{ attrData.ftLastWriteTime.dwLowDateTime, attrData.ftLastWriteTime.dwHighDateTime };
+        ULARGE_INTEGER sz{ attrData.nFileSizeLow, attrData.nFileSizeHigh };
+        if (s_cachedPath == launcherPath.string() &&
+            s_cachedMtime == ft.QuadPart &&
+            s_cachedSize == static_cast<long long>(sz.QuadPart) &&
+            !s_cachedHash.empty())
+        {
+            localHash = s_cachedHash;
+        }
+        else
+        {
+            localHash = integrity::createHashFromFile(launcherPath.string(), remoteHash);
+            if (!localHash.empty())
+            {
+                s_cachedPath = launcherPath.string();
+                s_cachedMtime = ft.QuadPart;
+                s_cachedSize = static_cast<long long>(sz.QuadPart);
+                s_cachedHash = localHash;
+            }
+        }
+    }
+    else
+    {
+        localHash = integrity::createHashFromFile(launcherPath.string(), remoteHash);
+    }
+
     if (localHash.empty() || localHash == remoteHash)
         return true;
 

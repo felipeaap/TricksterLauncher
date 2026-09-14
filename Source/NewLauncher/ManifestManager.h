@@ -15,6 +15,7 @@ public:
     explicit ManifestManager(FetchFunction fetch);
 
     int Load(FileList& files, bool isFullCheck, int& localVersion);
+    static int Parse(const std::string& consolidated, FileList& files, bool isFullCheck, int& localVersion);
 
 private:
     FetchFunction fetch_;

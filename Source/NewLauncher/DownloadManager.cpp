@@ -869,14 +869,18 @@ std::string DownloadManager::CombinePath(const std::string& path) const
 bool DownloadManager::Fetch(const std::string& path, std::string& outBody) const
 {
     const std::string fullPath = CombinePath(path);
+    const int timeout = (options_.connectionTimeoutSeconds > 0 && options_.connectionTimeoutSeconds < 4)
+        ? options_.connectionTimeoutSeconds
+        : 4;
+
     if (useSsl_)
     {
         httplib::SSLClient client(cleanHost_, port_);
-        return FetchImpl(client, fullPath, outBody, options_.connectionTimeoutSeconds);
+        return FetchImpl(client, fullPath, outBody, timeout);
     }
 
     httplib::Client client(cleanHost_, port_);
-    return FetchImpl(client, fullPath, outBody, options_.connectionTimeoutSeconds);
+    return FetchImpl(client, fullPath, outBody, timeout);
 }
 
 std::string DownloadManager::Get(const std::string& path) const

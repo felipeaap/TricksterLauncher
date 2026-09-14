@@ -5,7 +5,7 @@ VisualStudioVersion = 17.14.36127.28 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NewLauncher", "Source\NewLauncher\NewLauncher.vcxproj", "{B36FF2CB-80BF-4850-BFD8-0CD56DF0422B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FileListGen", "tools\FileListGen\FileListGen.vcxproj", "{6FE602DA-A3BE-4B7A-B5C3-4364FB56F558}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FileListGen", "Source\tools\FileListGen\FileListGen.vcxproj", "{6FE602DA-A3BE-4B7A-B5C3-4364FB56F558}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LauncherUpdater", "Source\LauncherUpdater\LauncherUpdater.vcxproj", "{4E9C7F7C-8D78-4A8A-8F0B-4E27AA6C6D12}"
 EndProject
