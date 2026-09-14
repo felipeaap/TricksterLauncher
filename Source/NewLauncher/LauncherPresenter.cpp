@@ -206,31 +206,11 @@ void LauncherPresenter::OnOption() noexcept
     STARTUPINFOA si = { sizeof(si) };
     PROCESS_INFORMATION pi{};
     const auto launcherDir = GetGamePath();
-    std::filesystem::path optionExe;
+    const std::string relativePath = config::OptionExecName.empty() ? "apps/Setup.exe" : config::OptionExecName;
+    const std::filesystem::path optionExe = launcherDir / relativePath;
+
     std::error_code ec;
-
-    const std::vector<std::string> candidates = {
-        config::OptionExecName,
-        "Trickster/Setup.exe",
-        "Trickster/apps/Setup.exe",
-        "Trickster/Option.exe",
-        "Trickster/setup.exe",
-        "apps/Setup.exe",
-        "Setup.exe"
-    };
-
-    for (const auto& candidate : candidates)
-    {
-        if (candidate.empty()) continue;
-        const auto path = launcherDir / candidate;
-        if (std::filesystem::exists(path, ec))
-        {
-            optionExe = path;
-            break;
-        }
-    }
-
-    if (optionExe.empty())
+    if (!std::filesystem::exists(optionExe, ec))
     {
         MessageBoxA(nullptr, lang::GetString("launcher_setup_fail").c_str(), "Error!", MB_OK);
         return;

@@ -7,7 +7,7 @@
     "patch-mirror2.example.com"
   ],
   "use_ssl": true,
-  "option_exec": "Setup.exe",
+  "option_exec": "apps/Setup.exe",
   "game_exec": "Trickster/trickster.bin",
   "region": "thailand",
   "manifest_require_signature": true,
