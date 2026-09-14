@@ -1,14 +1,21 @@
-# Visual Studio
+# Visual Studio / MSBuild
 .vs/
 *.user
 *.suo
 *.VC.db
+*.VC.opendb
+*.tlog/
+*.res
+*.obj
+*.idb
 
 # Build outputs
 [Bb]in/
 [Oo]bj/
 [Dd]ebug/
 [Rr]elease/
+**/Release/
+**/Debug/
 x64/
 x86/
 
@@ -23,12 +30,10 @@ Output/
 *.dll
 *.log
 
-# Test environments
+# Test environments & runtime data
 CDN_Test/
 Release_Test/
-
-# Runtime / Launcher data
+downloads/
 version.dat
-LauncherData/
+/LauncherData/
 test_subfolder/
-

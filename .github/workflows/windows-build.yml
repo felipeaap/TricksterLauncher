@@ -19,19 +19,12 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
-
-      - name: Restore NuGet packages
-        run: nuget restore "Trickster Launcher.sln"
-
       - name: Build Solution (Release x86)
         run: |
           msbuild "Trickster Launcher.sln" `
             /m `
             /p:Configuration=Release `
-            /p:Platform=x86 `
-            /p:RestorePackagesConfig=true
+            /p:Platform=x86
 
       - name: Run Unit Tests
         run: |
@@ -50,7 +43,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path "Output\ReleasePackage" | Out-Null
           Copy-Item "Output\Trickster Launcher\Splash.exe" "Output\ReleasePackage\"
           Copy-Item "Output\Trickster Launcher\LauncherUpdater.exe" "Output\ReleasePackage\"
-          Copy-Item "Output\Trickster Launcher\WebView2Loader.dll" "Output\ReleasePackage\"
           Copy-Item "config.example.json" "Output\ReleasePackage\"
           
           Compress-Archive -Path "Output\ReleasePackage\*" -DestinationPath "Output\TricksterLauncher-win32.zip" -Force
