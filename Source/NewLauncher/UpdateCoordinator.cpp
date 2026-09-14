@@ -23,6 +23,15 @@ void UpdateCoordinator::Check(std::vector<Arquivo>& files,
     ManifestManager manifests(fetch_);
     currentVersion = manifests.Load(files, fullCheck, localVersion);
 
+    // Fast-path: When opening the launcher normally without updates, skip heavy file scanning
+    if (!fullCheck && localVersion > 0 && currentVersion > 0 && localVersion >= currentVersion)
+    {
+        updateCount = 0;
+        if (progress_)
+            progress_(1.0f, 1.0f);
+        return;
+    }
+
     FileVerifier verifier([this](size_t current, size_t total, const Arquivo& file)
     {
         const float percent = total > 0
