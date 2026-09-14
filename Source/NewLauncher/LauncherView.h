@@ -95,6 +95,7 @@ private:
     void RenderLoginForm(
         float bottomCardY,
         const ImVec2& winSize,
+        const LauncherViewState& state,
         const LauncherViewEvents& events) noexcept;
 
     bool shouldClose_ = false;

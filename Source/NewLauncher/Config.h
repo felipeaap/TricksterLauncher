@@ -17,6 +17,8 @@ namespace config
     // Authentication endpoint (auth.php / launcher_auth.php)
     extern std::string AuthEndpointURL;
     extern std::string AuthToken;
+    extern std::string SavedAccount;
+    extern bool RememberAccount;
 
     /// Automatically resolves the auth endpoint URL from LauncherCDN if not explicitly configured.
     std::string GetResolvedAuthEndpointURL() noexcept;
@@ -30,4 +32,7 @@ namespace config
     /// Load settings from config.json located in the given directory.
     /// If the file does not exist or cannot be parsed, compiled-in defaults are preserved.
     void Load(const std::wstring& exeDir) noexcept;
+
+    /// Save persistent user settings (e.g. saved_account, remember_account) to config.json.
+    void Save(const std::wstring& exeDir) noexcept;
 }

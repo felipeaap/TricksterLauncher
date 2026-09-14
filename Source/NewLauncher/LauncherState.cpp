@@ -14,6 +14,9 @@ namespace LauncherState
     std::atomic<bool> isOptionEnabled{ false };
     std::atomic<bool> isMaintenance{ false };
     std::atomic<ServerStatus> serverStatus{ ServerStatus::Unknown };
+    std::mutex authErrorMutex;
+    std::string authErrorText;
+    std::atomic<bool> isAuthenticating{ false };
 
     LauncherViewState GetSnapshot()
     {
@@ -36,6 +39,12 @@ namespace LauncherState
         state.isOptionEnabled = isOptionEnabled.load(std::memory_order_relaxed);
         state.isMaintenance = isMaintenance.load(std::memory_order_relaxed);
         state.serverStatus = serverStatus.load(std::memory_order_relaxed);
+        state.isAuthenticating = isAuthenticating.load(std::memory_order_relaxed);
+
+        {
+            std::lock_guard<std::mutex> lock(authErrorMutex);
+            state.authErrorText = authErrorText;
+        }
 
         return state;
     }
@@ -73,5 +82,16 @@ namespace LauncherState
     void SetServerStatus(ServerStatus status)
     {
         serverStatus.store(status, std::memory_order_relaxed);
+    }
+
+    void SetAuthError(const std::string& error)
+    {
+        std::lock_guard<std::mutex> lock(authErrorMutex);
+        authErrorText = error;
+    }
+
+    void SetAuthenticating(bool authenticating)
+    {
+        isAuthenticating.store(authenticating, std::memory_order_relaxed);
     }
 }

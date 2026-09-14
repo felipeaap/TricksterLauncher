@@ -893,12 +893,21 @@ void LauncherView::SetSavedAccount(const std::string& account, bool remember) no
 void LauncherView::RenderLoginForm(
     float bottomCardY,
     const ImVec2& winSize,
+    const LauncherViewState& state,
     const LauncherViewEvents& events) noexcept
 {
     // 1. Header / Status line
     ImGui::SetCursorPos(ImVec2(28, bottomCardY + 6));
     if (fontBold_) ImGui::PushFont(fontBold_);
-    if (!authErrorText_.empty())
+    if (state.isAuthenticating)
+    {
+        ImGui::TextColored(ImVec4(0.15f, 0.45f, 0.90f, 1.0f), "Authenticating account...");
+    }
+    else if (!state.authErrorText.empty())
+    {
+        ImGui::TextColored(ImVec4(0.88f, 0.20f, 0.20f, 1.0f), "%s", state.authErrorText.c_str());
+    }
+    else if (!authErrorText_.empty())
     {
         ImGui::TextColored(ImVec4(0.88f, 0.20f, 0.20f, 1.0f), "%s", authErrorText_.c_str());
     }
@@ -921,6 +930,10 @@ void LauncherView::RenderLoginForm(
 
     if (fontRegular_) ImGui::PushFont(fontRegular_);
 
+    const ImGuiInputTextFlags inputFlags = state.isAuthenticating
+        ? (ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_EnterReturnsTrue)
+        : ImGuiInputTextFlags_EnterReturnsTrue;
+
     // Account ID Input
     ImGui::SetCursorPos(ImVec2(28, bottomCardY + 22));
     ImGui::SetNextItemWidth(210.0f);
@@ -929,7 +942,7 @@ void LauncherView::RenderLoginForm(
         lang::GetString("launcher_login_account").c_str(),
         accountBuffer_,
         sizeof(accountBuffer_),
-        ImGuiInputTextFlags_EnterReturnsTrue);
+        inputFlags);
 
     // Password Input
     ImGui::SetCursorPos(ImVec2(28, bottomCardY + 47));
@@ -939,7 +952,7 @@ void LauncherView::RenderLoginForm(
         lang::GetString("launcher_login_password").c_str(),
         passwordBuffer_,
         sizeof(passwordBuffer_),
-        ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGuiInputTextFlags_Password | inputFlags);
 
     if (fontRegular_) ImGui::PopFont();
 
@@ -961,28 +974,32 @@ void LauncherView::RenderLoginForm(
             "##btn_back",
             lang::GetString("launcher_login_back").c_str(),
             ImVec2(96, 32),
-            false,
+            state.isAuthenticating,
             ButtonIcon::Exit))
     {
-        showLoginForm_ = false;
-        authErrorText_.clear();
+        if (!state.isAuthenticating)
+        {
+            showLoginForm_ = false;
+            authErrorText_.clear();
+        }
     }
     if (fontBold_) ImGui::PopFont();
 
     // 4. Primary CONNECT Button
-    ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 22));
+    ImGui::SetCursorPos(ImVec2(winSize.x - 146, bottomCardY + 24));
     if (fontLarge_) ImGui::PushFont(fontLarge_);
+    const std::string connectLabel = state.isAuthenticating ? "..." : lang::GetString("launcher_login_connect");
     bool connectClicked = ModernButton(
         "##connect_btn",
-        lang::GetString("launcher_login_connect").c_str(),
-        ImVec2(118, 58),
-        false,
+        connectLabel.c_str(),
+        ImVec2(118, 62),
+        state.isAuthenticating,
         ButtonIcon::Play,
         IM_COL32(37, 99, 235, 255),
-        true);
+        !state.isAuthenticating);
     if (fontLarge_) ImGui::PopFont();
 
-    if (connectClicked || enterAccount || enterPass)
+    if (!state.isAuthenticating && (connectClicked || enterAccount || enterPass))
     {
         if (events.onConnectClicked)
         {
@@ -1272,7 +1289,7 @@ void LauncherView::Render(
 
         if (showLoginForm_)
         {
-            RenderLoginForm(bottomCardY, winSize, events);
+            RenderLoginForm(bottomCardY, winSize, state, events);
         }
         else
         {

@@ -23,6 +23,8 @@ struct LauncherViewState
     bool isOptionEnabled = false;
     bool isMaintenance = false;
     ServerStatus serverStatus = ServerStatus::Unknown;
+    std::string authErrorText;
+    bool isAuthenticating = false;
 };
 
 /// Shared launcher state written by worker/presenter threads and read by the render thread.
@@ -53,6 +55,11 @@ namespace LauncherState
     extern std::atomic<bool> isMaintenance;
     extern std::atomic<ServerStatus> serverStatus;
 
+    /// Protects authErrorText.
+    extern std::mutex authErrorMutex;
+    extern std::string authErrorText;
+    extern std::atomic<bool> isAuthenticating;
+
     /// Obtains a consistent snapshot for the view layer.
     LauncherViewState GetSnapshot();
 
@@ -63,4 +70,6 @@ namespace LauncherState
     void SetButtons(bool game, bool check, bool option);
     void SetMaintenance(bool maintenance);
     void SetServerStatus(ServerStatus status);
+    void SetAuthError(const std::string& error);
+    void SetAuthenticating(bool authenticating);
 }

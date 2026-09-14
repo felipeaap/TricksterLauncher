@@ -182,7 +182,7 @@ AuthResponse Authenticate(const std::string& username, const std::string& passwo
     const std::string status  = json.value("status",  "error");
     const std::string message = json.value("message", "Login failed.");
 
-    if (status == "success")
+    if (status == "success" || status == "ok")
     {
         return { AuthResult::Success, message };
     }

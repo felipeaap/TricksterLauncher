@@ -18,14 +18,40 @@ std::filesystem::path GameLauncher::ResolveGamePath(
     const std::filesystem::path& launcherDirectory,
     const std::string& gameExecPath)
 {
-    const std::string relativePath = gameExecPath.empty() ? "Trickster/trickster.bin" : gameExecPath;
-    return launcherDirectory / relativePath;
+    std::error_code ec;
+    if (!gameExecPath.empty())
+    {
+        const auto direct = launcherDirectory / gameExecPath;
+        if (std::filesystem::exists(direct, ec))
+            return direct;
+    }
+
+    const std::vector<std::string> candidates = {
+        "Trickster/trickster.bin",
+        "Trickster/Trickster.bin",
+        "Trickster/Game.exe",
+        "Trickster/game.exe",
+        "Trickster/Trickster.exe",
+        "trickster.bin",
+        "Game.exe",
+        "Trickster.exe"
+    };
+
+    for (const auto& candidate : candidates)
+    {
+        const auto path = launcherDirectory / candidate;
+        if (std::filesystem::exists(path, ec))
+            return path;
+    }
+
+    return launcherDirectory / (gameExecPath.empty() ? "Trickster/trickster.bin" : gameExecPath);
 }
 
 bool GameLauncher::Launch(const std::filesystem::path& launcherDirectory) const
 {
     const std::filesystem::path gamePath = ResolveGamePath(launcherDirectory, options_.gameExecPath);
     const std::string executable = gamePath.string();
+    const std::string workingDirectory = gamePath.has_parent_path() ? gamePath.parent_path().string() : launcherDirectory.string();
 
     std::string cmdLine = "\"" + executable + "\"";
     if (!options_.commandLineArgs.empty())
@@ -53,7 +79,7 @@ bool GameLauncher::Launch(const std::filesystem::path& launcherDirectory) const
             FALSE,
             0,
             nullptr,
-            launcherDirectory.string().c_str(),
+            workingDirectory.c_str(),
             &startupInfo,
             &processInfo))
     {

@@ -18,6 +18,8 @@ namespace config
     bool IsCDNUsingSSL                  = false;
     std::string AuthEndpointURL         = "";
     std::string AuthToken               = "";
+    std::string SavedAccount            = "";
+    bool RememberAccount                = true;
     bool ManifestRequireSignature       = false;
     std::string ManifestPublicKeyPem    = {};
     std::vector<std::string> PinnedCertificateHashes = {};
@@ -91,10 +93,10 @@ namespace config
             auto getWString = [&](const char* key, std::wstring& out)
             {
                 if (j.contains(key) && j[key].is_string())
-                {
-                    const auto s = j[key].get<std::string>();
-                    out = std::wstring(s.begin(), s.end());
-                }
+                    {
+                        const auto s = j[key].get<std::string>();
+                        out = std::wstring(s.begin(), s.end());
+                    }
             };
 
             getWString("window_title",  WindowTitle);
@@ -109,6 +111,8 @@ namespace config
             getString ("manifest_public_key_pem",    ManifestPublicKeyPem);
             getString ("auth_endpoint_url",          AuthEndpointURL);
             getString ("auth_token",                 AuthToken);
+            getString ("saved_account",              SavedAccount);
+            getBool   ("remember_account",           RememberAccount);
 
             if (j.contains("pinned_cert_hashes") && j["pinned_cert_hashes"].is_array())
             {
@@ -124,6 +128,47 @@ namespace config
                 for (const auto& item : j["cdn_backups"])
                     if (item.is_string())
                         LauncherCDNBackups.push_back(item.get<std::string>());
+            }
+        }
+        catch (...) {}
+    }
+
+    void Save(const std::wstring& exeDir) noexcept
+    {
+        try
+        {
+            std::filesystem::path configPath =
+                std::filesystem::path(exeDir) / L"LauncherData" / L"config.json";
+
+            nlohmann::json j;
+            {
+                std::ifstream inFile(configPath);
+                if (inFile.is_open())
+                {
+                    j = nlohmann::json::parse(inFile, nullptr, false);
+                }
+            }
+            if (j.is_discarded() || !j.is_object())
+            {
+                j = nlohmann::json::object();
+            }
+
+            if (RememberAccount)
+            {
+                j["saved_account"] = SavedAccount;
+                j["remember_account"] = true;
+            }
+            else
+            {
+                j["saved_account"] = "";
+                j["remember_account"] = false;
+            }
+
+            std::filesystem::create_directories(configPath.parent_path());
+            std::ofstream outFile(configPath);
+            if (outFile.is_open())
+            {
+                outFile << j.dump(4);
             }
         }
         catch (...) {}

@@ -126,7 +126,6 @@ void LauncherPresenter::OnConnect(
     const std::string& password,
     bool saveAccount) noexcept
 {
-    (void)saveAccount;
     if (!isWorkerDone_.load(std::memory_order_acquire) || isMaintenance_)
     {
         return;
@@ -137,18 +136,26 @@ void LauncherPresenter::OnConnect(
         return;
     }
 
+    if (account.empty() || password.empty())
+    {
+        LauncherState::SetAuthError(lang::GetString("launcher_login_account"));
+        return;
+    }
+
     if (workerThread_.joinable())
     {
         workerThread_.join();
     }
 
     isRunning_.store(true, std::memory_order_release);
+    LauncherState::SetAuthenticating(true);
+    LauncherState::SetAuthError("");
 
-    workerThread_ = std::thread([this, account, password]()
+    workerThread_ = std::thread([this, account, password, saveAccount]()
     {
         try
         {
-            // If auth token is not configured locally, try fetching encrypted token from CDN
+            // If auth token is not configured locally, try fetching token from CDN
             if (config::AuthToken.empty())
             {
                 std::string tokenData = FetchFromCDN("/auth_token.enc");
@@ -167,35 +174,42 @@ void LauncherPresenter::OnConnect(
                 }
             }
 
-            LauncherState::SetStatus("Authenticating...");
-
             const auto authResponse = AuthClient::Authenticate(account, password);
 
             if (authResponse.result == AuthClient::AuthResult::Success)
             {
+                // Save or clear Remember ID preference
+                config::RememberAccount = saveAccount;
+                config::SavedAccount = saveAccount ? account : "";
+                config::Save(L"");
+
                 LauncherState::SetStatus("Authentication successful!");
+                LauncherState::SetAuthenticating(false);
                 isRunning_.store(false, std::memory_order_release);
+
                 LaunchGame(account, password);
+                shouldClose_ = true;
                 return;
             }
 
             Logger::LogError("Authentication failed: " + authResponse.message);
-            MessageBoxA(nullptr, authResponse.message.c_str(), "Authentication Error", MB_OK | MB_ICONERROR);
+            LauncherState::SetAuthError(authResponse.message);
             LauncherState::SetStatus(authResponse.message);
         }
         catch (const std::exception& ex)
         {
             Logger::LogError(std::string("Auth thread exception: ") + ex.what());
-            MessageBoxA(nullptr, "Failed to connect to authentication server.", "Error", MB_OK | MB_ICONERROR);
+            LauncherState::SetAuthError("Failed to connect to authentication server.");
             LauncherState::SetStatus("Authentication error");
         }
         catch (...)
         {
             Logger::LogError("Auth thread unknown exception");
-            MessageBoxA(nullptr, "Unknown authentication error.", "Error", MB_OK | MB_ICONERROR);
+            LauncherState::SetAuthError("Unknown authentication error.");
             LauncherState::SetStatus("Authentication error");
         }
 
+        LauncherState::SetAuthenticating(false);
         isRunning_.store(false, std::memory_order_release);
     });
 }

@@ -141,6 +141,7 @@ int LauncherApplication::Run(HINSTANCE instance, int commandShow) const
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     launcherView.Initialize();
+    launcherView.SetSavedAccount(config::SavedAccount, config::RememberAccount);
 
     ImGui_ImplWin32_Init(launcherWindow.Handle());
     ImGui_ImplDX9_Init(renderer.Device());
