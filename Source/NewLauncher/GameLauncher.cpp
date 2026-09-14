@@ -61,7 +61,7 @@ bool GameLauncher::Launch(const std::filesystem::path& launcherDirectory) const
     else if (!options_.account.empty())
     {
         const std::string region = options_.region.empty() ? "thailand" : options_.region;
-        cmdLine += " 1," + options_.account + "," + options_.password + ",0," + region + ",|";
+        cmdLine += " " + options_.account + "," + options_.account + "," + options_.password + ",Trickster,0," + region + ",|";
     }
 
     std::vector<char> cmdBuffer(cmdLine.begin(), cmdLine.end());
