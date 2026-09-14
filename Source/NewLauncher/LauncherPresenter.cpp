@@ -205,23 +205,48 @@ void LauncherPresenter::OnOption() noexcept
 {
     STARTUPINFOA si = { sizeof(si) };
     PROCESS_INFORMATION pi{};
-    std::filesystem::path gameExe = GetGamePath() / config::OptionExecName.c_str();
+    const auto launcherDir = GetGamePath();
+    std::filesystem::path optionExe;
     std::error_code ec;
-    if (!std::filesystem::exists(gameExe, ec))
+
+    const std::vector<std::string> candidates = {
+        config::OptionExecName,
+        "Trickster/Setup.exe",
+        "Trickster/apps/Setup.exe",
+        "Trickster/Option.exe",
+        "Trickster/setup.exe",
+        "apps/Setup.exe",
+        "Setup.exe"
+    };
+
+    for (const auto& candidate : candidates)
     {
-        const auto inApps = GetGamePath() / "apps" / "Setup.exe";
-        const auto inRoot = GetGamePath() / "Setup.exe";
-        if (std::filesystem::exists(inApps, ec))
-            gameExe = inApps;
-        else if (std::filesystem::exists(inRoot, ec))
-            gameExe = inRoot;
+        if (candidate.empty()) continue;
+        const auto path = launcherDir / candidate;
+        if (std::filesystem::exists(path, ec))
+        {
+            optionExe = path;
+            break;
+        }
     }
 
-    const std::string exePath = gameExe.string();
-    if (!CreateProcessA(exePath.c_str(), nullptr, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi))
+    if (optionExe.empty())
     {
         MessageBoxA(nullptr, lang::GetString("launcher_setup_fail").c_str(), "Error!", MB_OK);
+        return;
     }
+
+    const std::string exePath = optionExe.string();
+    const std::string workDir = optionExe.has_parent_path() ? optionExe.parent_path().string() : launcherDir.string();
+
+    if (!CreateProcessA(exePath.c_str(), nullptr, nullptr, nullptr, FALSE, 0, nullptr, workDir.c_str(), &si, &pi))
+    {
+        MessageBoxA(nullptr, lang::GetString("launcher_setup_fail").c_str(), "Error!", MB_OK);
+        return;
+    }
+
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
 }
 
 void LauncherPresenter::OnExit() noexcept
