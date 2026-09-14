@@ -155,25 +155,6 @@ void LauncherPresenter::OnConnect(
     {
         try
         {
-            // If auth token is not configured locally, try fetching token from CDN
-            if (config::AuthToken.empty())
-            {
-                std::string tokenData = FetchFromCDN("/auth_token.enc");
-                if (tokenData.empty())
-                {
-                    tokenData = FetchFromCDN("/auth_token.txt");
-                }
-
-                // Trim whitespace/newlines
-                tokenData.erase(tokenData.find_last_not_of(" \n\r\t") + 1);
-                tokenData.erase(0, tokenData.find_first_not_of(" \n\r\t"));
-
-                if (!tokenData.empty())
-                {
-                    config::AuthToken = tokenData;
-                }
-            }
-
             const auto authResponse = AuthClient::Authenticate(account, password);
 
             if (authResponse.result == AuthClient::AuthResult::Success)

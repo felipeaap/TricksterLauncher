@@ -105,11 +105,15 @@ AuthResponse Authenticate(const std::string& username, const std::string& passwo
         return { AuthResult::ServiceUnavailable, "Login service unavailable." };
     }
 
-    // Build form-encoded body: auth_token=X&username=Y&password=Z
-    const std::string body =
-        "auth_token=" + UrlEncode(config::AuthToken)  +
-        "&username="  + UrlEncode(username)            +
-        "&password="  + UrlEncode(password);
+    // Build form-encoded body: username=Y&password=Z (optional auth_token)
+    std::string body =
+        "username=" + UrlEncode(username) +
+        "&password=" + UrlEncode(password);
+
+    if (!config::AuthToken.empty())
+    {
+        body += "&auth_token=" + UrlEncode(config::AuthToken);
+    }
 
     static constexpr int kConnectTimeout = 5;
     static constexpr int kReadTimeout    = 15;
