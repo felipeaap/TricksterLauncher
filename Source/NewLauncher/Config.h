@@ -8,7 +8,6 @@ namespace config
     extern std::string SubTitle;
     extern std::string LauncherCDN;
     extern std::vector<std::string> LauncherCDNBackups;
-    extern std::string OptionExecName;
     extern std::string GameExecName;
     extern std::string Region;
     extern std::string Language;

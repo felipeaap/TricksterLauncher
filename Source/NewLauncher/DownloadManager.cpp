@@ -22,7 +22,7 @@ namespace
 {
 std::filesystem::path MakeDownloadsStagingPath(const std::filesystem::path& destination)
 {
-    const std::filesystem::path downloadsBase = "downloads";
+    const std::filesystem::path downloadsBase = "LauncherData/downloads";
 
     std::filesystem::path rel = destination.lexically_normal();
     if (destination.is_absolute())

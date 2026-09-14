@@ -204,30 +204,7 @@ void LauncherPresenter::OnCheckFiles() noexcept
 
 void LauncherPresenter::OnOption() noexcept
 {
-    STARTUPINFOA si = { sizeof(si) };
-    PROCESS_INFORMATION pi{};
-    const auto launcherDir = GetGamePath();
-    const std::string relativePath = config::OptionExecName.empty() ? "apps/Setup.exe" : config::OptionExecName;
-    const std::filesystem::path optionExe = launcherDir / relativePath;
-
-    std::error_code ec;
-    if (!std::filesystem::exists(optionExe, ec))
-    {
-        MessageBoxA(nullptr, lang::GetString("launcher_setup_fail").c_str(), "Error!", MB_OK);
-        return;
-    }
-
-    const std::string exePath = optionExe.string();
-    const std::string workDir = optionExe.has_parent_path() ? optionExe.parent_path().string() : launcherDir.string();
-
-    if (!CreateProcessA(exePath.c_str(), nullptr, nullptr, nullptr, FALSE, 0, nullptr, workDir.c_str(), &si, &pi))
-    {
-        MessageBoxA(nullptr, lang::GetString("launcher_setup_fail").c_str(), "Error!", MB_OK);
-        return;
-    }
-
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
+    Logger::Log("LauncherPresenter: Options clicked -> Native GameSettings modal opened.");
 }
 
 void LauncherPresenter::OnExit() noexcept

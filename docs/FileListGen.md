@@ -32,7 +32,7 @@ FileListGen.exe "C:\Game\Trickster" "C:\CDN\manifest.json"
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `version` | `int` | Incremental version number. The launcher compares this against its local `version.dat` to know if updates exist. |
+| `version` | `int` | Incremental version number. The launcher compares this against its local `LauncherData/version.dat` to know if updates exist. |
 | `FileID` | `int` | Sequential file identifier. |
 | `FileHash` | `string` | SHA-256 hex digest of the file contents. |
 | `FilePath` | `string` | Relative path from the game root directory. Uses forward slashes. |
@@ -48,6 +48,6 @@ FileListGen.exe "C:\Game\Trickster" "C:\CDN\manifest.json"
 
 ## Versioning
 
-Each time you regenerate the manifest, the version number should be incremented. The launcher stores the last downloaded version in `version.dat` and only re-checks files when a newer version is available on the CDN.
+Each time you regenerate the manifest, the version number should be incremented. The launcher stores the last downloaded version in `LauncherData/version.dat` and only re-checks files when a newer version is available on the CDN.
 
 For a **full check** (button in the UI), the launcher ignores the version number and re-verifies all files by hash.

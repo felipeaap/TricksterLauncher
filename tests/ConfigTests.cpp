@@ -5,6 +5,7 @@
 
 #include "Config.h"
 #include "Language.h"
+#include "../Source/NewLauncher/GameSettings.h"
 
 namespace
 {
@@ -47,8 +48,7 @@ void RunConfigTests()
             "cdn": "myserver.example.com:8080",
             "subtitle": "Test Subtitle",
             "use_ssl": true,
-            "cdn_backups": ["backup1.com", "backup2.com"],
-            "option_exec": "Options.exe"
+            "cdn_backups": ["backup1.com", "backup2.com"]
         })";
         const std::wstring dir = WriteTempConfig(json);
         config::Load(dir);
@@ -59,7 +59,6 @@ void RunConfigTests()
         assert(config::LauncherCDNBackups.size() == 2);
         assert(config::LauncherCDNBackups[0] == "backup1.com");
         assert(config::LauncherCDNBackups[1] == "backup2.com");
-        assert(config::OptionExecName == "Options.exe");
 
         RemoveTempConfig();
     }
@@ -108,12 +107,11 @@ void RunConfigTests()
 
         const std::filesystem::path configPath = dataDir / "config.json";
         std::ofstream f(configPath);
-        f << R"({ "cdn": "subfolder.cdn.com", "option_exec": "apps/Setup.exe" })";
+        f << R"({ "cdn": "subfolder.cdn.com" })";
         f.close();
 
         config::Load(tmpDir.wstring());
         assert(config::LauncherCDN == "subfolder.cdn.com");
-        assert(config::OptionExecName == "apps/Setup.exe");
 
         std::filesystem::remove_all(tmpDir);
     }
@@ -149,5 +147,49 @@ void RunConfigTests()
         std::filesystem::remove_all(tmpDir);
     }
 
-    std::cout << "[PASS] Config and Language (i18n) tests passed!" << std::endl;
+    // ── Test 8: GameSettings Registry Read/Write (HKCU\Software\Trickster_NT) ─
+    {
+        GameConfig customCfg;
+        customCfg.widthPixel = 1280;
+        customCfg.heightPixel = 720;
+        customCfg.fullScreen = true;
+        customCfg.useSound = true;
+        customCfg.soundFrequency = 44100;
+        customCfg.soundBit = 16;
+        customCfg.soundStereo = true;
+        customCfg.sample2D = 48;
+        customCfg.sample3D = 48;
+        customCfg.streamSample = 48;
+        customCfg.use3dEffect = false;
+        customCfg.useMapEffect = true;
+        customCfg.captureFormat = "JPG";
+        customCfg.captureQuality = "Very High";
+
+        bool saved = GameSettings::Save(customCfg);
+        assert(saved == true);
+
+        GameConfig loadedCfg = GameSettings::Load();
+        assert(loadedCfg.widthPixel == 1280);
+        assert(loadedCfg.heightPixel == 720);
+        assert(loadedCfg.fullScreen == true);
+        assert(loadedCfg.useSound == true);
+        assert(loadedCfg.soundFrequency == 44100);
+        assert(loadedCfg.soundBit == 16);
+        assert(loadedCfg.soundStereo == true);
+        assert(loadedCfg.sample2D == 48);
+        assert(loadedCfg.sample3D == 48);
+        assert(loadedCfg.streamSample == 48);
+        assert(loadedCfg.use3dEffect == false);
+        assert(loadedCfg.useMapEffect == true);
+        assert(loadedCfg.captureFormat == "JPG");
+        assert(loadedCfg.captureQuality == "Very High");
+
+        // Verify default fallback structure
+        GameConfig defaults = GameSettings::GetDefaults();
+        assert(defaults.widthPixel == 1024);
+        assert(defaults.heightPixel == 768);
+        assert(defaults.fullScreen == false);
+    }
+
+    std::cout << "[PASS] Config, Language (i18n), and GameSettings registry tests passed!" << std::endl;
 }

@@ -44,19 +44,20 @@ Run the test suite from the root directory:
 
 ## 📦 Patch Server Deployment
 
-The repository includes a ready-to-use deploy package in `xampp_deploy/` (and zipped as `xampp_patch_server.zip`):
+The repository includes a ready-to-use deploy package in `deploy/`:
 
 ```text
-patch/
-  ├── FileListGen.exe    # Scans files and generates manifest.json and launcher.txt
-  ├── Splash.exe         # Latest launcher binary for self-updating
-  ├── launcher.txt       # SHA-256 hash of Splash.exe
-  ├── manifest.json      # Game client file manifest
-  └── auth.php           # Authentication proxy endpoint
-README_DEPLOY.txt
+deploy/
+├── README_DEPLOY.txt
+└── patch/
+    ├── FileListGen.exe    # Scans files and generates manifest.json and launcher.txt
+    ├── Splash.exe         # Latest launcher binary for self-updating
+    ├── launcher.txt       # SHA-256 hash of Splash.exe
+    ├── manifest.json      # Game client file manifest
+    └── auth.php           # Authentication proxy endpoint
 ```
 
-To update client files on the CDN, place new game client files under `patch/`, navigate to `patch/` in terminal, and execute:
+To update client files on the CDN, place new game client files under `deploy/patch/`, navigate to `deploy/patch/` in terminal, and execute:
 ```powershell
 .\FileListGen.exe
 ```
@@ -71,7 +72,6 @@ To update client files on the CDN, place new game client files under `patch/`, n
   "subtitle": "Game Launcher",
   "cdn": "127.0.0.1/patch",
   "use_ssl": false,
-  "option_exec": "apps/Setup.exe",
   "game_exec": "Trickster/trickster.bin",
   "region": "thailand"
 }

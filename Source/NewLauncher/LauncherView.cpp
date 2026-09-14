@@ -1008,6 +1008,445 @@ void LauncherView::RenderLoginForm(
     }
 }
 
+void LauncherView::OpenSettings() noexcept
+{
+    pendingSettings_ = GameSettings::Load();
+    showSettingsModal_ = true;
+    settingsToastTimer_ = 0.0f;
+}
+
+void LauncherView::RenderSettingsModal(const ImVec2& winSize) noexcept
+{
+    ImGuiIO& io = ImGui::GetIO();
+    float dt = io.DeltaTime;
+    if (dt <= 0.0f) dt = 1.0f / 60.0f;
+    if (dt > 0.1f) dt = 0.1f;
+
+    const float targetAnim = showSettingsModal_ ? 1.0f : 0.0f;
+    const float lerpSpeed = 16.0f;
+    const float lerpFactor = 1.0f - expf(-lerpSpeed * dt);
+    settingsModalAnim_ += (targetAnim - settingsModalAnim_) * lerpFactor;
+    if (fabsf(settingsModalAnim_ - targetAnim) < 0.001f)
+        settingsModalAnim_ = targetAnim;
+
+    if (settingsToastTimer_ > 0.0f)
+        settingsToastTimer_ = (std::max)(0.0f, settingsToastTimer_ - dt);
+
+    if (settingsModalAnim_ <= 0.001f)
+        return;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+
+    // 1. Smooth Dark Dim Backdrop
+    const int backdropAlpha = static_cast<int>(180.0f * settingsModalAnim_);
+    dl->AddRectFilled(
+        ImVec2(0, 0),
+        winSize,
+        IM_COL32(15, 23, 42, backdropAlpha));
+
+    // 2. Modal Card Geometry
+    const float modalW = 492.0f;
+    const float modalH = 432.0f;
+    const float modalX = (winSize.x - modalW) * 0.5f;
+    const float modalY = (winSize.y - modalH) * 0.5f;
+    const ImVec2 cardP0(modalX, modalY);
+    const ImVec2 cardP1(modalX + modalW, modalY + modalH);
+    const float cardRounding = 12.0f;
+
+    // Card Outer Shadow
+    dl->AddRectFilled(
+        ImVec2(cardP0.x + 2.0f, cardP0.y + 4.0f),
+        ImVec2(cardP1.x + 2.0f, cardP1.y + 6.0f),
+        IM_COL32(0, 0, 0, static_cast<int>(70.0f * settingsModalAnim_)),
+        cardRounding);
+
+    // Card Background
+    dl->AddRectFilled(cardP0, cardP1, IM_COL32(255, 255, 255, 255), cardRounding);
+
+    // Header Background
+    const float headerH = 46.0f;
+    dl->AddRectFilled(
+        cardP0,
+        ImVec2(cardP1.x, cardP0.y + headerH),
+        IM_COL32(240, 246, 252, 255),
+        cardRounding,
+        ImDrawFlags_RoundCornersTop);
+    dl->AddLine(
+        ImVec2(cardP0.x, cardP0.y + headerH),
+        ImVec2(cardP1.x, cardP0.y + headerH),
+        IM_COL32(218, 228, 239, 255),
+        1.0f);
+
+    // Header Title
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    dl->AddText(
+        ImVec2(cardP0.x + 18.0f, cardP0.y + 8.0f),
+        IM_COL32(15, 23, 42, 255),
+        lang::GetString("settings_title").c_str());
+    if (fontBold_) ImGui::PopFont();
+
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    dl->AddText(
+        ImVec2(cardP0.x + 18.0f, cardP0.y + 26.0f),
+        IM_COL32(100, 116, 139, 255),
+        "HKCU\\Software\\Trickster_NT");
+    if (fontSmall_) ImGui::PopFont();
+
+    // Close 'X' Button at top-right of modal
+    ImGui::SetCursorPos(ImVec2(modalX + modalW - 36.0f, modalY + 9.0f));
+    if (ModernButton("##settings_close_x", "X", ImVec2(28.0f, 28.0f), false, ButtonIcon::None, IM_COL32(220, 38, 38, 255)))
+    {
+        showSettingsModal_ = false;
+    }
+
+    // 3. Tab Pill Switchers
+    const float tabY = modalY + headerH + 10.0f;
+    const float tabH = 30.0f;
+    const float tabW = (modalW - 36.0f - 16.0f) / 3.0f;
+
+    const std::string tabTitles[3] = {
+        lang::GetString("settings_tab_video"),
+        lang::GetString("settings_tab_audio"),
+        lang::GetString("settings_tab_graphics")
+    };
+
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    for (int i = 0; i < 3; ++i)
+    {
+        const float tabX = modalX + 18.0f + i * (tabW + 8.0f);
+        ImGui::SetCursorPos(ImVec2(tabX, tabY));
+        const bool isActiveTab = (settingsActiveTab_ == i);
+        const std::string tabId = "##tab_btn_" + std::to_string(i);
+
+        ImU32 tabAccent = isActiveTab ? IM_COL32(37, 99, 235, 255) : IM_COL32(226, 232, 240, 255);
+        if (ModernButton(tabId.c_str(), tabTitles[i].c_str(), ImVec2(tabW, tabH), false, ButtonIcon::None, tabAccent))
+        {
+            settingsActiveTab_ = i;
+        }
+    }
+    if (fontSmall_) ImGui::PopFont();
+
+    // 4. Content Area
+    const float contentX = modalX + 18.0f;
+    const float contentY = tabY + tabH + 12.0f;
+    const float contentW = modalW - 36.0f;
+    const float contentH = 250.0f;
+
+    // Content container card
+    dl->AddRectFilled(
+        ImVec2(contentX, contentY),
+        ImVec2(contentX + contentW, contentY + contentH),
+        IM_COL32(248, 250, 252, 255),
+        8.0f);
+    dl->AddRect(
+        ImVec2(contentX, contentY),
+        ImVec2(contentX + contentW, contentY + contentH),
+        IM_COL32(226, 232, 240, 255),
+        8.0f,
+        0,
+        1.0f);
+
+    // Style inputs within content
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(255, 255, 255, 255));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(241, 245, 249, 255));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, IM_COL32(230, 240, 255, 255));
+    ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(203, 213, 225, 255));
+    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(15, 23, 42, 255));
+    ImGui::PushStyleColor(ImGuiCol_CheckMark, IM_COL32(37, 99, 235, 255));
+    ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(220, 238, 253, 255));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(190, 225, 250, 255));
+
+    // Tab Contents
+    if (settingsActiveTab_ == 0)
+    {
+        // ── Video & Display ──
+        float curY = contentY + 16.0f;
+
+        // Resolution
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(ImVec4(0.12f, 0.18f, 0.28f, 1.0f), "%s", lang::GetString("settings_resolution").c_str());
+        if (fontBold_) ImGui::PopFont();
+        curY += 24.0f;
+
+        const auto& resolutions = GameSettings::GetSupportedResolutions();
+        int currentResIdx = 1; // Default 1024x768
+        for (size_t i = 0; i < resolutions.size(); ++i)
+        {
+            if (resolutions[i].width == pendingSettings_.widthPixel &&
+                resolutions[i].height == pendingSettings_.heightPixel)
+            {
+                currentResIdx = static_cast<int>(i);
+                break;
+            }
+        }
+
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        ImGui::SetNextItemWidth(contentW - 32.0f);
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        if (ImGui::BeginCombo("##resolution_combo", resolutions[currentResIdx].label.c_str()))
+        {
+            for (size_t i = 0; i < resolutions.size(); ++i)
+            {
+                const bool isSelected = (currentResIdx == static_cast<int>(i));
+                if (ImGui::Selectable(resolutions[i].label.c_str(), isSelected))
+                {
+                    pendingSettings_.widthPixel = resolutions[i].width;
+                    pendingSettings_.heightPixel = resolutions[i].height;
+                }
+                if (isSelected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        if (fontRegular_) ImGui::PopFont();
+        curY += 40.0f;
+
+        // Full Screen
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        ImGui::Checkbox(lang::GetString("settings_fullscreen").c_str(), &pendingSettings_.fullScreen);
+        if (fontRegular_) ImGui::PopFont();
+        curY += 34.0f;
+
+        // Visual helper note
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(
+            ImVec4(0.40f, 0.48f, 0.58f, 1.0f),
+            "Tip: Select 1024x768 for classic 4:3 or 1280x720 / 1920x1080\nfor widescreen monitors.");
+        if (fontSmall_) ImGui::PopFont();
+    }
+    else if (settingsActiveTab_ == 1)
+    {
+        // ── Audio ──
+        float curY = contentY + 16.0f;
+
+        // Enable sound
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        ImGui::Checkbox(lang::GetString("settings_sound_enable").c_str(), &pendingSettings_.useSound);
+        curY += 32.0f;
+
+        // Stereo
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        ImGui::Checkbox(lang::GetString("settings_sound_stereo").c_str(), &pendingSettings_.soundStereo);
+        if (fontRegular_) ImGui::PopFont();
+        curY += 36.0f;
+
+        // Frequency & Bit Depth side-by-side
+        const float halfColW = (contentW - 40.0f) * 0.5f;
+
+        // Frequency
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(ImVec4(0.12f, 0.18f, 0.28f, 1.0f), "%s", lang::GetString("settings_sound_freq").c_str());
+        if (fontBold_) ImGui::PopFont();
+
+        // Bit depth
+        ImGui::SetCursorPos(ImVec2(contentX + 24.0f + halfColW, curY));
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(ImVec4(0.12f, 0.18f, 0.28f, 1.0f), "%s", lang::GetString("settings_sound_bit").c_str());
+        if (fontBold_) ImGui::PopFont();
+        curY += 22.0f;
+
+        // Frequency combo
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        ImGui::SetNextItemWidth(halfColW);
+        const char* freqLabels[2] = { "44,100 Hz (High)", "22,050 Hz (Low)" };
+        int freqIdx = (pendingSettings_.soundFrequency == 22050) ? 1 : 0;
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        if (ImGui::BeginCombo("##freq_combo", freqLabels[freqIdx]))
+        {
+            if (ImGui::Selectable(freqLabels[0], freqIdx == 0)) pendingSettings_.soundFrequency = 44100;
+            if (ImGui::Selectable(freqLabels[1], freqIdx == 1)) pendingSettings_.soundFrequency = 22050;
+            ImGui::EndCombo();
+        }
+
+        // Bit Depth combo
+        ImGui::SetCursorPos(ImVec2(contentX + 24.0f + halfColW, curY));
+        ImGui::SetNextItemWidth(halfColW);
+        const char* bitLabels[2] = { "16-Bit (High Quality)", "8-Bit (Standard)" };
+        int bitIdx = (pendingSettings_.soundBit == 8) ? 1 : 0;
+        if (ImGui::BeginCombo("##bit_combo", bitLabels[bitIdx]))
+        {
+            if (ImGui::Selectable(bitLabels[0], bitIdx == 0)) pendingSettings_.soundBit = 16;
+            if (ImGui::Selectable(bitLabels[1], bitIdx == 1)) pendingSettings_.soundBit = 8;
+            ImGui::EndCombo();
+        }
+        if (fontRegular_) ImGui::PopFont();
+        curY += 38.0f;
+
+        // Max Channels
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(ImVec4(0.12f, 0.18f, 0.28f, 1.0f), "%s", lang::GetString("settings_sound_channels").c_str());
+        if (fontBold_) ImGui::PopFont();
+        curY += 22.0f;
+
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        ImGui::SetNextItemWidth(contentW - 32.0f);
+        const int channelValues[4] = { 48, 32, 16, 8 };
+        const char* channelLabels[4] = { "48 Channels (High)", "32 Channels (Default)", "16 Channels", "8 Channels" };
+        int chanIdx = 1;
+        for (int c = 0; c < 4; ++c)
+        {
+            if (pendingSettings_.sample2D == channelValues[c]) { chanIdx = c; break; }
+        }
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        if (ImGui::BeginCombo("##chan_combo", channelLabels[chanIdx]))
+        {
+            for (int c = 0; c < 4; ++c)
+            {
+                if (ImGui::Selectable(channelLabels[c], chanIdx == c))
+                {
+                    pendingSettings_.sample2D = channelValues[c];
+                    pendingSettings_.sample3D = channelValues[c];
+                    pendingSettings_.streamSample = channelValues[c];
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (fontRegular_) ImGui::PopFont();
+    }
+    else if (settingsActiveTab_ == 2)
+    {
+        // ── Graphics & Capture ──
+        float curY = contentY + 16.0f;
+
+        // 3D & Map effects
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        ImGui::Checkbox(lang::GetString("settings_3d_effect").c_str(), &pendingSettings_.use3dEffect);
+        curY += 30.0f;
+
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        ImGui::Checkbox(lang::GetString("settings_map_effect").c_str(), &pendingSettings_.useMapEffect);
+        if (fontRegular_) ImGui::PopFont();
+        curY += 36.0f;
+
+        const float halfColW = (contentW - 40.0f) * 0.5f;
+
+        // Screenshot Format
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(ImVec4(0.12f, 0.18f, 0.28f, 1.0f), "%s", lang::GetString("settings_capture_format").c_str());
+        if (fontBold_) ImGui::PopFont();
+
+        // JPEG Quality
+        ImGui::SetCursorPos(ImVec2(contentX + 24.0f + halfColW, curY));
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(ImVec4(0.12f, 0.18f, 0.28f, 1.0f), "%s", lang::GetString("settings_capture_quality").c_str());
+        if (fontBold_) ImGui::PopFont();
+        curY += 22.0f;
+
+        // Format Combo
+        ImGui::SetCursorPos(ImVec2(contentX + 16.0f, curY));
+        ImGui::SetNextItemWidth(halfColW);
+        const char* fmtLabels[2] = { "JPG", "BMP" };
+        int fmtIdx = (_stricmp(pendingSettings_.captureFormat.c_str(), "BMP") == 0) ? 1 : 0;
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        if (ImGui::BeginCombo("##fmt_combo", fmtLabels[fmtIdx]))
+        {
+            if (ImGui::Selectable(fmtLabels[0], fmtIdx == 0)) pendingSettings_.captureFormat = "JPG";
+            if (ImGui::Selectable(fmtLabels[1], fmtIdx == 1)) pendingSettings_.captureFormat = "BMP";
+            ImGui::EndCombo();
+        }
+
+        // Quality Combo
+        ImGui::SetCursorPos(ImVec2(contentX + 24.0f + halfColW, curY));
+        ImGui::SetNextItemWidth(halfColW);
+        const char* qualLabels[4] = { "Low", "Middle", "High", "Very High" };
+        int qualIdx = 3; // Default Very High
+        for (int q = 0; q < 4; ++q)
+        {
+            if (_stricmp(pendingSettings_.captureQuality.c_str(), qualLabels[q]) == 0)
+            {
+                qualIdx = q;
+                break;
+            }
+        }
+        if (ImGui::BeginCombo("##qual_combo", qualLabels[qualIdx]))
+        {
+            for (int q = 0; q < 4; ++q)
+            {
+                if (ImGui::Selectable(qualLabels[q], qualIdx == q))
+                    pendingSettings_.captureQuality = qualLabels[q];
+            }
+            ImGui::EndCombo();
+        }
+        if (fontRegular_) ImGui::PopFont();
+    }
+
+    ImGui::PopStyleColor(8);
+    ImGui::PopStyleVar(2);
+
+    // 5. Modal Footer Action Bar
+    const float footerY = modalY + modalH - 44.0f;
+
+    // Toast notification when saved
+    if (settingsToastTimer_ > 0.0f)
+    {
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        dl->AddText(
+            ImVec2(modalX + 18.0f, footerY - 18.0f),
+            IM_COL32(16, 185, 129, 255),
+            lang::GetString("settings_saved_success").c_str());
+        if (fontSmall_) ImGui::PopFont();
+    }
+
+    // Button: DEFAULTS
+    ImGui::SetCursorPos(ImVec2(modalX + 18.0f, footerY));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    if (ModernButton(
+            "##btn_settings_defaults",
+            lang::GetString("settings_defaults").c_str(),
+            ImVec2(90.0f, 32.0f),
+            false,
+            ButtonIcon::None,
+            IM_COL32(148, 163, 184, 255)))
+    {
+        pendingSettings_ = GameSettings::GetDefaults();
+    }
+    if (fontSmall_) ImGui::PopFont();
+
+    // Button: CANCEL
+    ImGui::SetCursorPos(ImVec2(modalX + modalW - 206.0f, footerY));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    if (ModernButton(
+            "##btn_settings_cancel",
+            lang::GetString("settings_cancel").c_str(),
+            ImVec2(88.0f, 32.0f),
+            false,
+            ButtonIcon::Exit,
+            IM_COL32(148, 163, 184, 255)))
+    {
+        showSettingsModal_ = false;
+    }
+    if (fontSmall_) ImGui::PopFont();
+
+    // Button: SAVE (Royal Blue CTA)
+    ImGui::SetCursorPos(ImVec2(modalX + modalW - 108.0f, footerY));
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    if (ModernButton(
+            "##btn_settings_save",
+            lang::GetString("settings_save").c_str(),
+            ImVec2(90.0f, 32.0f),
+            false,
+            ButtonIcon::Check,
+            IM_COL32(37, 99, 235, 255),
+            true))
+    {
+        if (GameSettings::Save(pendingSettings_))
+        {
+            settingsToastTimer_ = 3.0f;
+        }
+    }
+    if (fontBold_) ImGui::PopFont();
+}
+
 void LauncherView::Render(
     const LauncherViewState& state,
     const LauncherViewEvents& events) noexcept
@@ -1400,8 +1839,12 @@ void LauncherView::Render(
                     optionLocked,
                     ButtonIcon::Settings))
             {
-                if (!optionLocked && events.onOptionClicked)
-                    events.onOptionClicked();
+                if (!optionLocked)
+                {
+                    OpenSettings();
+                    if (events.onOptionClicked)
+                        events.onOptionClicked();
+                }
             }
 
             // Button: Exit
@@ -1421,6 +1864,9 @@ void LauncherView::Render(
 
             if (fontBold_) ImGui::PopFont();
         }
+
+        // ── Settings Modal Overlay ──
+        RenderSettingsModal(winSize);
 
         ImGui::End();
     }

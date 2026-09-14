@@ -10,24 +10,6 @@ int VersionManager::Load(const char* path, int defaultVersion)
 
     if (!std::filesystem::exists(targetPath, ec))
     {
-        // Check for legacy root version.dat migration
-        const std::filesystem::path legacyPath("version.dat");
-        if (targetPath != legacyPath && std::filesystem::exists(legacyPath, ec))
-        {
-            std::ifstream legacyFile(legacyPath);
-            if (legacyFile)
-            {
-                int legacyVer = defaultVersion;
-                legacyFile >> legacyVer;
-                legacyFile.close();
-                if (!legacyFile.fail())
-                {
-                    Save(legacyVer, path);
-                    std::filesystem::remove(legacyPath, ec);
-                    return legacyVer;
-                }
-            }
-        }
         return defaultVersion;
     }
 

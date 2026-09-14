@@ -37,3 +37,6 @@ downloads/
 version.dat
 /LauncherData/
 test_subfolder/
+xampp_deploy/
+*.zip
+

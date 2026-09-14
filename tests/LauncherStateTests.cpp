@@ -110,17 +110,8 @@ void RunLauncherStateTests()
         assert(VersionManager::Save(105, testPath) == true);
         assert(VersionManager::Load(testPath, 1) == 105);
 
-        // Test legacy migration from version.dat in root
-        const char* legacyPath = "version.dat";
-        const char* migratedPath = "test_subfolder/LauncherData/migrated_version.dat";
-        std::ofstream(legacyPath) << 250;
-        assert(VersionManager::Load(migratedPath, 1) == 250);
-        assert(!std::filesystem::exists(legacyPath, ec)); // Removed after migration
-        assert(VersionManager::Load(migratedPath, 1) == 250);
-
         // Cleanup
         std::filesystem::remove(testPath, ec);
-        std::filesystem::remove(migratedPath, ec);
         std::filesystem::remove("test_subfolder/LauncherData", ec);
         std::filesystem::remove("test_subfolder", ec);
     }

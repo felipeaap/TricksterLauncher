@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 #include <unordered_map>
+#include "GameSettings.h"
 #include "LauncherState.h"
 #include "imgui.h"
 
@@ -45,6 +46,10 @@ public:
 
     void SetSavedAccount(const std::string& account, bool remember = true) noexcept;
     void SetAuthError(const std::string& error) noexcept { authErrorText_ = error; }
+
+    void OpenSettings() noexcept;
+    void CloseSettings() noexcept { showSettingsModal_ = false; }
+    bool IsSettingsOpen() const noexcept { return showSettingsModal_; }
 
     void LoadHeroTexture(struct IDirect3DDevice9* device, const std::wstring& exeDir = L"") noexcept;
     void UnloadHeroTexture() noexcept;
@@ -98,6 +103,8 @@ private:
         const LauncherViewState& state,
         const LauncherViewEvents& events) noexcept;
 
+    void RenderSettingsModal(const ImVec2& winSize) noexcept;
+
     bool shouldClose_ = false;
     bool showLoginForm_ = false;
     float loginFormAnim_ = 0.0f;
@@ -105,6 +112,12 @@ private:
     char passwordBuffer_[64] = { 0 };
     bool rememberAccount_ = true;
     std::string authErrorText_;
+
+    bool showSettingsModal_ = false;
+    float settingsModalAnim_ = 0.0f;
+    int settingsActiveTab_ = 0;
+    GameConfig pendingSettings_;
+    float settingsToastTimer_ = 0.0f;
 
     ImFont* fontSmall_ = nullptr;
     ImFont* fontRegular_ = nullptr;

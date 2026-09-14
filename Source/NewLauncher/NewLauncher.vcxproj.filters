@@ -24,6 +24,7 @@
     <ClCompile Include="EndpointManager.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="FileVerifier.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="GameLauncher.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
+    <ClCompile Include="GameSettings.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Integrity.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="Language.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
     <ClCompile Include="LauncherApplication.cpp"><Filter>Arquivos de Origem</Filter></ClCompile>
@@ -58,6 +59,7 @@
     <ClInclude Include="EndpointManager.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="FileVerifier.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="GameLauncher.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
+    <ClInclude Include="GameSettings.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="httplib.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="Integrity.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>
     <ClInclude Include="Language.h"><Filter>Arquivos de Cabeçalho</Filter></ClInclude>

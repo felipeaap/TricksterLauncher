@@ -41,7 +41,6 @@
      "subtitle": "Game Launcher",
      "cdn": "127.0.0.1/patch",
      "use_ssl": false,
-     "option_exec": "apps/Setup.exe",
      "game_exec": "Trickster/trickster.bin",
      "region": "thailand"
    }
